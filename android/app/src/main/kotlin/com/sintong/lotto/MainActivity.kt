@@ -1,4 +1,4 @@
-package com.example.lotto_vip
+package com.sintong.lotto
 
 import io.flutter.embedding.android.FlutterActivity
 

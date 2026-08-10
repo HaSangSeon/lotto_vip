@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../utils/safe_google_fonts.dart';
 import '../theme/app_theme.dart';
 
 /// 유리(글래스모피즘) 카드 컨테이너

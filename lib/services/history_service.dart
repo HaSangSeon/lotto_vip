@@ -35,13 +35,17 @@ class HistoryService {
   static const _maxEntries = 20;
 
   static Future<List<LottoHistoryEntry>> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getStringList(_key) ?? [];
-    return raw
-        .map((e) => LottoHistoryEntry.fromJson(jsonDecode(e)))
-        .toList()
-        .reversed
-        .toList();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getStringList(_key) ?? [];
+      return raw
+          .map((e) => LottoHistoryEntry.fromJson(jsonDecode(e)))
+          .toList()
+          .reversed
+          .toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   static Future<void> save(LottoHistoryEntry entry) async {

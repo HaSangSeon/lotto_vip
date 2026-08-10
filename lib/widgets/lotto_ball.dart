@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../utils/safe_google_fonts.dart';
 import '../theme/app_theme.dart';
 
 /// 로또 볼 위젯 - 3D 입체 그라데이션 및 디테일한 광택 표현

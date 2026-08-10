@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'utils/safe_google_fonts.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:screenshot/screenshot.dart';
@@ -17,11 +17,26 @@ import 'widgets/latest_draw_tab.dart';
 import 'widgets/statistics_tab.dart';
 import 'services/history_service.dart';
 
+import 'dart:ui' as ui;
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  GoogleFonts.config.allowRuntimeFetching = false;
-  await AppTheme.init();
-  MobileAds.instance.initialize();
+  
+  FlutterError.onError = (FlutterErrorDetails details) {
+    debugPrint('FlutterError caught safely: ${details.exception}');
+  };
+
+  ui.PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('PlatformDispatcher error caught safely: $error');
+    return true; // Prevents app crash
+  };
+
+  try {
+    await AppTheme.init();
+    MobileAds.instance.initialize();
+  } catch (e) {
+    debugPrint('Initialization error: $e');
+  }
   runApp(const LottoVipApp());
 }
 
@@ -129,29 +144,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _loadBannerAd() async {
-    final AnchoredAdaptiveBannerAdSize? size =
-        await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(
-            MediaQuery.of(context).size.width.truncate());
+    try {
+      if (!mounted) return;
+      final screenWidth = MediaQuery.of(context).size.width.truncate();
+      if (screenWidth <= 0) return;
+      final AnchoredAdaptiveBannerAdSize? size =
+          await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(screenWidth);
 
-    _bannerAd = BannerAd(
-      adUnitId: Platform.isAndroid
-          ? 'ca-app-pub-3702899361747571/7789923273'
-          : 'ca-app-pub-3940256099942544/2934735716',
-      size: size ?? AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (ad) {
-          setState(() {
-            _bannerAdWidget = AdWidget(ad: ad as BannerAd);
-            _isBannerLoaded = true;
-          });
-        },
-        onAdFailedToLoad: (ad, error) {
-          ad.dispose();
-          _isBannerAdLoading = false;
-        },
-      ),
-    )..load();
+      _bannerAd = BannerAd(
+        adUnitId: Platform.isAndroid
+            ? 'ca-app-pub-3702899361747571/7789923273'
+            : 'ca-app-pub-3940256099942544/2934735716',
+        size: size ?? AdSize.banner,
+        request: const AdRequest(),
+        listener: BannerAdListener(
+          onAdLoaded: (ad) {
+            if (mounted) {
+              setState(() {
+                _bannerAdWidget = AdWidget(ad: ad as BannerAd);
+                _isBannerLoaded = true;
+              });
+            }
+          },
+          onAdFailedToLoad: (ad, error) {
+            ad.dispose();
+            _isBannerAdLoading = false;
+          },
+        ),
+      )..load();
+    } catch (_) {
+      _isBannerAdLoading = false;
+    }
   }
 
   void _loadInterstitialAd() {
