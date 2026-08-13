@@ -178,6 +178,53 @@ class _QrScannerViewState extends State<QrScannerView> {
                 controller: _controller,
                 onDetect: _onDetect,
                 fit: BoxFit.cover,
+                errorBuilder: (context, error) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.videocam_off_rounded, color: Colors.white70, size: 64),
+                          const SizedBox(height: 16),
+                          Text(
+                            '카메라를 실행할 수 없습니다.',
+                            style: GoogleFonts.notoSansKr(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '카메라 권한이 허용되지 않았거나 카메라를 사용할 수 없습니다.\n[URL 직접 입력] 버튼으로 당첨을 확인하실 수 있습니다.',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.notoSansKr(
+                              color: Colors.white70,
+                              fontSize: 13,
+                              height: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          ElevatedButton.icon(
+                            onPressed: _showManualInputDialog,
+                            icon: const Icon(Icons.keyboard, size: 18),
+                            label: Text(
+                              'QR URL 직접 입력하기',
+                              style: GoogleFonts.notoSansKr(fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.gold,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
 
