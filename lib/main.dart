@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -151,10 +152,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final AnchoredAdaptiveBannerAdSize? size =
           await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(screenWidth);
 
+      final adUnitId = kReleaseMode
+          ? (Platform.isAndroid
+              ? 'ca-app-pub-3702899361747571/7789923273'
+              : 'ca-app-pub-3940256099942544/2934735716')
+          : (Platform.isAndroid
+              ? 'ca-app-pub-3940256099942544/6300978111'
+              : 'ca-app-pub-3940256099942544/2934735716');
+
       _bannerAd = BannerAd(
-        adUnitId: Platform.isAndroid
-            ? 'ca-app-pub-3702899361747571/7789923273'
-            : 'ca-app-pub-3940256099942544/2934735716',
+        adUnitId: adUnitId,
         size: size ?? AdSize.banner,
         request: const AdRequest(),
         listener: BannerAdListener(
@@ -180,10 +187,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _loadInterstitialAd() {
+    final adUnitId = kReleaseMode
+        ? (Platform.isAndroid
+            ? 'ca-app-pub-3702899361747571/3248043033'
+            : 'ca-app-pub-3940256099942544/4411468910')
+        : (Platform.isAndroid
+            ? 'ca-app-pub-3940256099942544/1033173712'
+            : 'ca-app-pub-3940256099942544/4411468910');
+
     InterstitialAd.load(
-      adUnitId: Platform.isAndroid
-          ? 'ca-app-pub-3702899361747571/3248043033'
-          : 'ca-app-pub-3940256099942544/4411468910',
+      adUnitId: adUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) => _interstitialAd = ad,
@@ -240,16 +253,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
     final result = picked.toList()..sort();
 
-    _showInterstitialAd(() {
-      setState(() => _vipNumbers = result);
-      final entry = LottoHistoryEntry(
-        title: 'VIP 행운 번호',
-        numbers: result,
-        createdAt: DateTime.now(),
-      );
-      HistoryService.save(entry).then((_) => _loadHistory());
-      _showResultSheet('👑 VIP 행운 번호', result, true);
-    });
+    setState(() => _vipNumbers = result);
+    final entry = LottoHistoryEntry(
+      title: 'VIP 행운 번호',
+      numbers: result,
+      createdAt: DateTime.now(),
+    );
+    HistoryService.save(entry).then((_) => _loadHistory());
+    _showResultSheet('👑 VIP 행운 번호', result, true);
   }
 
   void _generateCustomNumbers() {
@@ -272,16 +283,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     final result = picked.toList()..sort();
 
-    _showInterstitialAd(() {
-      setState(() => _customNumbers = result);
-      final entry = LottoHistoryEntry(
-        title: '맞춤 번호 조합',
-        numbers: result,
-        createdAt: DateTime.now(),
-      );
-      HistoryService.save(entry).then((_) => _loadHistory());
-      _showResultSheet('⚙️ 커스텀 맞춤 번호', result, false);
-    });
+    setState(() => _customNumbers = result);
+    final entry = LottoHistoryEntry(
+      title: '맞춤 번호 조합',
+      numbers: result,
+      createdAt: DateTime.now(),
+    );
+    HistoryService.save(entry).then((_) => _loadHistory());
+    _showResultSheet('⚙️ 커스텀 맞춤 번호', result, false);
   }
 
   void _showToast(String msg) {
@@ -303,7 +312,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         numbers: numbers,
         isVip: isVip,
       ),
-    );
+    ).then((_) {
+      // 번호 결과를 먼저 확인한 후, 결과 창을 닫았을 때 전면 광고 노출
+      _showInterstitialAd(() {});
+    });
   }
 
   void _openCustomDialog() {
@@ -781,6 +793,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           history: _history,
           onClear: () async {
             await HistoryService.clear();
+            await _loadHistory();
+          },
+          onDeleteEntry: (entry) async {
             await _loadHistory();
           },
         );

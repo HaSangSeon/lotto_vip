@@ -73,6 +73,24 @@ class HistoryService {
     await prefs.setStringList(_key, toSave);
   }
 
+  /// 특정 기록 개별 삭제
+  static Future<void> delete(LottoHistoryEntry entry) async {
+    final currentList = await load();
+    currentList.removeWhere((e) =>
+        e.createdAt.millisecondsSinceEpoch == entry.createdAt.millisecondsSinceEpoch &&
+        e.title == entry.title);
+    await updateAll(currentList);
+  }
+
+  /// 인덱스 기준 개별 삭제
+  static Future<void> deleteAt(int index) async {
+    final currentList = await load();
+    if (index >= 0 && index < currentList.length) {
+      currentList.removeAt(index);
+      await updateAll(currentList);
+    }
+  }
+
   /// 기록 전체 삭제
   static Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
