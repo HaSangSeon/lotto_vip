@@ -32,8 +32,12 @@ class AppColors {
   static const gold = Color(0xFFFFD700);
   static const goldLight = Color(0xFFFFF0A0);
   static const goldDark = Color(0xFFB8860B);
-  static const goldDeep = Color(0xFF92690A);
+  static const goldDeep = Color(0xFF855A00); // 라이트모드 고대비 딥골드
   static const goldGlow = Color(0x33FFD700);
+
+  /// 라이트 모드에서는 짙은 딥골드, 다크 모드에서는 밝은 골드를 반환하는 텍스트/아이콘 전용 컬러
+  static Color get goldText => isLight ? goldDeep : gold;
+  static Color get goldAccent => isLight ? goldDark : gold;
 
   // Accent
   static const purple = Color(0xFF6C3FC5);

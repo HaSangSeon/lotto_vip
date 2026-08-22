@@ -11,6 +11,7 @@ class VipTab extends StatelessWidget {
   final TextEditingController ctrl;
   final List<int> vipNumbers;
   final VoidCallback onGenerate;
+  final ValueChanged<String>? onBirthDateChanged;
   final AnimationController shimmerCtrl;
 
   const VipTab({
@@ -18,6 +19,7 @@ class VipTab extends StatelessWidget {
     required this.ctrl,
     required this.vipNumbers,
     required this.onGenerate,
+    this.onBirthDateChanged,
     required this.shimmerCtrl,
   });
 
@@ -79,7 +81,7 @@ class VipTab extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const Icon(Icons.auto_awesome, color: AppColors.gold, size: 40),
+                    const Icon(Icons.auto_awesome, color: AppColors.goldDark, size: 40),
                   ],
                 )
                     .animate(onPlay: (c) => c.repeat())
@@ -110,6 +112,7 @@ class VipTab extends StatelessWidget {
                 // 입력 필드
                 TextField(
                   controller: ctrl,
+                  onChanged: onBirthDateChanged,
                   keyboardType: TextInputType.number,
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
@@ -117,9 +120,9 @@ class VipTab extends StatelessWidget {
                   ],
                   textAlign: TextAlign.center,
                   style: GoogleFonts.rajdhani(
-                    color: AppColors.gold,
+                    color: AppColors.goldText,
                     fontSize: 28,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: 6,
                   ),
                   decoration: InputDecoration(
@@ -212,14 +215,14 @@ class VipTab extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.stars, color: AppColors.gold, size: 18),
+                      Icon(Icons.stars, color: AppColors.goldText, size: 18),
                       const SizedBox(width: 6),
                       Text(
-                        '오늘의 당첨 예상 번호',
+                        '오늘 뽑은 행운 번호',
                         style: GoogleFonts.notoSansKr(
-                          color: AppColors.gold,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
+                          color: AppColors.goldText,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
                         ),
                       ),
                     ],
@@ -244,7 +247,7 @@ class VipTab extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    '💡 생년월일이 같더라도 날짜가 바뀌면 매일 새로운 행운 번호가 부여됩니다.',
+                    '💡 생년월일은 기기에 안전하게 자동 저장되어, 매일 접속 시 오늘의 새로운 행운 번호가 자동으로 완성됩니다.',
                     style: GoogleFonts.notoSansKr(
                       color: AppColors.textSecondary,
                       fontSize: 12,

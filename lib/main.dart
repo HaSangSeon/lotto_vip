@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
@@ -9,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'theme/app_theme.dart';
 import 'services/history_service.dart';
+import 'services/notification_service.dart';
 import 'widgets/splash_screen.dart';
 import 'widgets/latest_draw_tab.dart';
 import 'widgets/statistics_tab.dart';
@@ -17,6 +19,7 @@ import 'widgets/custom_tab.dart';
 import 'widgets/history_tab.dart';
 import 'widgets/custom_settings_sheet.dart';
 import 'widgets/result_sheet.dart';
+import 'widgets/notification_settings_dialog.dart';
 
 import 'dart:ui' as ui;
 
@@ -34,6 +37,7 @@ void main() async {
 
   try {
     await AppTheme.init();
+    await NotificationService.init();
     MobileAds.instance.initialize();
   } catch (e) {
     debugPrint('Initialization error: $e');
@@ -88,6 +92,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   List<LottoHistoryEntry> _history = [];
 
+  int _generationCount = 0;
+  DateTime? _lastInterstitialAdShownTime;
+
   late AnimationController _shimmerCtrl;
   late AnimationController _pulseCtrl;
 
@@ -97,6 +104,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _loadSavedBirthDate();
+    _loadSavedCustomFilters();
     _loadInterstitialAd();
     _loadHistory();
 
@@ -109,6 +117,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
+
+    NotificationService.onNotificationPayload.addListener(_onNotificationTapped);
+  }
+
+  void _onNotificationTapped() {
+    final payload = NotificationService.onNotificationPayload.value;
+    if (payload != null && mounted) {
+      setState(() {
+        _selectedTab = 4; // 보관함(히스토리) 탭으로 이동
+      });
+      NotificationService.onNotificationPayload.value = null; // 초기화
+    }
   }
 
   @override
@@ -122,6 +142,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    NotificationService.onNotificationPayload.removeListener(_onNotificationTapped);
     _shimmerCtrl.dispose();
     _pulseCtrl.dispose();
     _bannerAd?.dispose();
@@ -129,14 +150,83 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  Future<void> _loadSavedBirthDate() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() => _birthDateCtrl.text = prefs.getString('birthDate') ?? '');
+  List<int> _calculateVipNumbers(String birthDate) {
+    if (birthDate.length < 6) return [];
+    final now = DateTime.now();
+    final dateStr = "${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}";
+    final seedString = "${birthDate}_$dateStr";
+
+    int hash = 0;
+    for (int i = 0; i < seedString.length; i++) {
+      hash = (hash * 31 + seedString.codeUnitAt(i)) & 0x7FFFFFFF;
+    }
+
+    final rand = Random(hash);
+    final Set<int> picked = {};
+    while (picked.length < 6) {
+      picked.add(rand.nextInt(45) + 1);
+    }
+    return picked.toList()..sort();
   }
 
-  Future<void> _saveBirthDate() async {
+  String _todayString() {
+    final now = DateTime.now();
+    return "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+  }
+
+  Future<void> _loadSavedBirthDate() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('birthDate', _birthDateCtrl.text);
+    final saved = prefs.getString('birthDate') ?? '';
+    final lastDate = prefs.getString('last_vip_generated_date') ?? '';
+    final today = _todayString();
+
+    List<int> restoredNums = [];
+    if (saved.isNotEmpty && lastDate == today) {
+      final rawList = prefs.getStringList('last_vip_numbers') ?? [];
+      restoredNums = rawList
+          .map((e) => int.tryParse(e) ?? 0)
+          .where((n) => n > 0 && n <= 45)
+          .toList();
+    }
+
+    if (mounted) {
+      setState(() {
+        _birthDateCtrl.text = saved;
+        _vipNumbers = restoredNums;
+      });
+    }
+  }
+
+  Future<void> _saveBirthDate(String birthDate) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('birthDate', birthDate);
+  }
+
+  void _onBirthDateChanged(String val) {
+    _saveBirthDate(val);
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.remove('last_vip_generated_date');
+      prefs.remove('last_vip_numbers');
+    });
+    if (_vipNumbers.isNotEmpty) {
+      setState(() => _vipNumbers = []);
+    }
+  }
+
+  Future<void> _loadSavedCustomFilters() async {
+    final prefs = await SharedPreferences.getInstance();
+    final incStr = prefs.getStringList('custom_include_numbers') ?? [];
+    final excStr = prefs.getStringList('custom_exclude_numbers') ?? [];
+    setState(() {
+      _includeNumbers = incStr.map((e) => int.tryParse(e) ?? 0).where((n) => n > 0 && n <= 45).toList();
+      _excludeNumbers = excStr.map((e) => int.tryParse(e) ?? 0).where((n) => n > 0 && n <= 45).toList();
+    });
+  }
+
+  Future<void> _saveCustomFilters(List<int> inc, List<int> exc) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('custom_include_numbers', inc.map((e) => e.toString()).toList());
+    await prefs.setStringList('custom_exclude_numbers', exc.map((e) => e.toString()).toList());
   }
 
   Future<void> _loadHistory() async {
@@ -209,7 +299,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _showInterstitialAd(VoidCallback onComplete) {
+    // 1) 번호 생성 3회마다 1회 노출 검사 (1회, 2회차는 광고 없이 쾌적하게 통과)
+    if (_generationCount == 0 || _generationCount % 3 != 0) {
+      onComplete();
+      return;
+    }
+
+    // 2) 최소 90초(1분 30초) 쿨타임 검사 (최근 광고 시청 후 일정 시간 방어)
+    if (_lastInterstitialAdShownTime != null) {
+      final elapsed = DateTime.now().difference(_lastInterstitialAdShownTime!);
+      if (elapsed < const Duration(seconds: 90)) {
+        onComplete();
+        return;
+      }
+    }
+
+    // 3) 광고 노출 및 재로드
     if (_interstitialAd != null) {
+      _lastInterstitialAdShownTime = DateTime.now();
       _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
         onAdDismissedFullScreenContent: (ad) {
           ad.dispose();
@@ -230,40 +337,67 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  void _generateVipNumbers() {
+  Future<void> _showCalculationLoading({
+    required String title,
+    required String step1,
+    required String step2,
+  }) async {
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _CalculationLoadingDialog(
+        title: title,
+        step1: step1,
+        step2: step2,
+      ),
+    );
+  }
+
+  Future<void> _generateVipNumbers() async {
     if (_birthDateCtrl.text.length < 6) {
       _showToast('생년월일 6자리를 입력해주세요.');
       return;
     }
-    _saveBirthDate();
+    _saveBirthDate(_birthDateCtrl.text);
 
-    final now = DateTime.now();
-    final dateStr = "${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}";
-    final seedString = "${_birthDateCtrl.text}_$dateStr";
-
-    int hash = 0;
-    for (int i = 0; i < seedString.length; i++) {
-      hash = (hash * 31 + seedString.codeUnitAt(i)) & 0x7FFFFFFF;
-    }
-
-    final rand = Random(hash);
-    final Set<int> picked = {};
-    while (picked.length < 6) {
-      picked.add(rand.nextInt(45) + 1);
-    }
-    final result = picked.toList()..sort();
-
-    setState(() => _vipNumbers = result);
-    final entry = LottoHistoryEntry(
-      title: 'VIP 행운 번호',
-      numbers: result,
-      createdAt: DateTime.now(),
+    await _showCalculationLoading(
+      title: '👑 행운 번호 정밀 분석',
+      step1: '생년월일과 오늘의 기운 데이터 분석 중...',
+      step2: '최적의 6개 행운 번호 조합 도출 중...',
     );
-    HistoryService.save(entry).then((_) => _loadHistory());
+
+    if (!mounted) return;
+
+    _generationCount++;
+    final result = _calculateVipNumbers(_birthDateCtrl.text);
+    setState(() => _vipNumbers = result);
+
+    // 당일 생성 번호 및 날짜 저장
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('last_vip_generated_date', _todayString());
+      prefs.setStringList('last_vip_numbers', result.map((e) => e.toString()).toList());
+    });
+
+    // 이미 보관함에 동일한 번호 조합이 있는지 확인하여 중복 저장 방지
+    final isAlreadySaved = _history.any((entry) =>
+        entry.numbers.length == result.length &&
+        entry.numbers.every((n) => result.contains(n)));
+
+    if (!isAlreadySaved) {
+      final entry = LottoHistoryEntry(
+        title: 'VIP 행운 번호',
+        numbers: result,
+        createdAt: DateTime.now(),
+      );
+      await HistoryService.save(entry);
+      await _loadHistory();
+    }
+
     _showResultSheet('👑 VIP 행운 번호', result, true);
   }
 
-  void _generateCustomNumbers() {
+  Future<void> _generateCustomNumbers() async {
     final Set<int> picked = Set.from(_includeNumbers);
     final Set<int> excSet = Set.from(_excludeNumbers);
 
@@ -276,6 +410,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return;
     }
 
+    await _showCalculationLoading(
+      title: '⚡ 맞춤 번호 알고리즘 연산',
+      step1: '지정된 고정수/제외수 필터링 중...',
+      step2: '빅데이터 확률 기반 최적 번호 조합 중...',
+    );
+
+    if (!mounted) return;
+
+    _generationCount++;
     available.shuffle();
     while (picked.length < 6 && available.isNotEmpty) {
       picked.add(available.removeLast());
@@ -331,12 +474,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             _includeNumbers = inc;
             _excludeNumbers = exc;
           });
+          _saveCustomFilters(inc, exc);
         },
         onGenerate: () {
           Navigator.pop(context);
           _generateCustomNumbers();
         },
       ),
+    );
+  }
+
+  void _showNotificationSettingsDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => const NotificationSettingsDialog(),
     );
   }
 
@@ -707,11 +858,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 : null,
             child: IconButton(
               icon: Icon(
+                Icons.notifications_outlined,
+                color: AppColors.isLight ? AppColors.goldDeep : AppColors.textSecondary,
+              ),
+              tooltip: '추첨 알림 설정',
+              onPressed: _showNotificationSettingsDialog,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Container(
+            decoration: AppColors.isLight
+                ? BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.lightAccentAmber.withValues(alpha: 0.6),
+                  )
+                : null,
+            child: IconButton(
+              icon: Icon(
                 AppTheme.themeModeNotifier.value == ThemeMode.light
                     ? Icons.dark_mode_rounded
                     : Icons.light_mode_rounded,
                 color: AppColors.isLight ? AppColors.goldDeep : AppColors.textSecondary,
               ),
+              tooltip: '테마 변경',
               onPressed: AppTheme.toggleTheme,
             ),
           ),
@@ -776,6 +945,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ctrl: _birthDateCtrl,
           vipNumbers: _vipNumbers,
           onGenerate: _generateVipNumbers,
+          onBirthDateChanged: _onBirthDateChanged,
           shimmerCtrl: _shimmerCtrl,
         );
       case 3:
@@ -826,3 +996,132 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 }
+
+class _CalculationLoadingDialog extends StatefulWidget {
+  final String title;
+  final String step1;
+  final String step2;
+
+  const _CalculationLoadingDialog({
+    required this.title,
+    required this.step1,
+    required this.step2,
+  });
+
+  @override
+  State<_CalculationLoadingDialog> createState() => _CalculationLoadingDialogState();
+}
+
+class _CalculationLoadingDialogState extends State<_CalculationLoadingDialog> {
+  late String _currentStep;
+  Timer? _stepTimer;
+  Timer? _closeTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentStep = widget.step1;
+    _stepTimer = Timer(const Duration(milliseconds: 650), () {
+      if (mounted) {
+        setState(() => _currentStep = widget.step2);
+      }
+    });
+    _closeTimer = Timer(const Duration(milliseconds: 1300), () {
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _stepTimer?.cancel();
+    _closeTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 40),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: AppColors.isLight ? AppColors.lightGoldBorder : AppColors.borderGold,
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.gold.withValues(alpha: 0.25),
+              blurRadius: 30,
+              spreadRadius: 4,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.gold.withValues(alpha: 0.12),
+              ),
+              child: Center(
+                child: SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.isLight ? AppColors.goldDark : AppColors.gold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              widget.title,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: Text(
+                _currentStep,
+                key: ValueKey(_currentStep),
+                textAlign: TextAlign.center,
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 13,
+                  color: AppColors.isLight ? AppColors.goldDark : AppColors.goldLight,
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '알고리즘 연산 진행 중...',
+              style: GoogleFonts.notoSansKr(
+                fontSize: 11,
+                color: AppColors.textHint,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
