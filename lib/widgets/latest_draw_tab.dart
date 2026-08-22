@@ -6,6 +6,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../theme/app_theme.dart';
 import '../services/dhlottery_api.dart';
+import '../services/statistics_service.dart';
 import 'common_widgets.dart';
 import 'lotto_ball.dart';
 import 'qr_scanner_view.dart';
@@ -361,8 +362,180 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
               ],
             ),
           ),
+
+          const SizedBox(height: 20),
+
+          // 역대 누적 통계 분석 (HOT & COLD)
+          _buildStatisticsSection(),
+
+          const SizedBox(height: 16),
         ],
       ),
+    );
+  }
+
+  /// 역대 누적 번호 통계 분석 카드
+  Widget _buildStatisticsSection() {
+    final hotNumbers = StatisticsService.getHotNumbers(5);
+    final coldNumbers = StatisticsService.getColdNumbers(5);
+    final isLight = AppColors.isLight;
+
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 20),
+      borderColor: AppColors.borderGold,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.analytics_rounded, color: AppColors.goldText, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                '역대 번호 출현 통계',
+                style: GoogleFonts.notoSansKr(
+                  color: AppColors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isLight
+                      ? const Color(0xFFFFF0C2)
+                      : AppColors.gold.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isLight
+                        ? const Color(0xFFD4AF37)
+                        : AppColors.gold.withValues(alpha: 0.3),
+                    width: 0.8,
+                  ),
+                ),
+                child: Text(
+                  '1회 ~ 현재 누적',
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.goldText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+
+          // HOT 번호
+          _buildStatGroup(
+            'HOT 가장 많이 나온 번호',
+            hotNumbers,
+            const Color(0xFFE74C3C),
+            Icons.local_fire_department_rounded,
+          ),
+
+          const SizedBox(height: 18),
+          Divider(
+            color: isLight
+                ? AppColors.lightGoldBorder.withValues(alpha: 0.2)
+                : Colors.white.withValues(alpha: 0.08),
+            height: 1,
+          ),
+          const SizedBox(height: 18),
+
+          // COLD 번호
+          _buildStatGroup(
+            'COLD 가장 적게 나온 번호',
+            coldNumbers,
+            const Color(0xFF3498DB),
+            Icons.ac_unit_rounded,
+          ),
+
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isLight
+                  ? Colors.black.withValues(alpha: 0.03)
+                  : Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: AppColors.textHint, size: 14),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '역대 동행복권 1등 당첨 데이터 기준 (보너스 번호 제외)',
+                    style: GoogleFonts.notoSansKr(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatGroup(
+    String title,
+    List<MapEntry<int, int>> data,
+    Color accentColor,
+    IconData icon,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: accentColor, size: 17),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: GoogleFonts.notoSansKr(
+                color: AppColors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: data.map((entry) {
+            return Column(
+              children: [
+                LottoBall(number: entry.key, size: 38),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: accentColor.withValues(alpha: 0.35),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Text(
+                    '${entry.value}회',
+                    style: GoogleFonts.rajdhani(
+                      color: AppColors.isLight ? accentColor : AppColors.textPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 

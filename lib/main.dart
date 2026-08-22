@@ -13,7 +13,6 @@ import 'services/history_service.dart';
 import 'services/notification_service.dart';
 import 'widgets/splash_screen.dart';
 import 'widgets/latest_draw_tab.dart';
-import 'widgets/statistics_tab.dart';
 import 'widgets/vip_tab.dart';
 import 'widgets/custom_tab.dart';
 import 'widgets/history_tab.dart';
@@ -125,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final payload = NotificationService.onNotificationPayload.value;
     if (payload != null && mounted) {
       setState(() {
-        _selectedTab = 4; // 보관함(히스토리) 탭으로 이동
+        _selectedTab = 3; // 보관함(히스토리) 탭으로 이동
       });
       NotificationService.onNotificationPayload.value = null; // 초기화
     }
@@ -686,7 +685,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       unselectedLabelStyle: GoogleFonts.notoSansKr(fontSize: 11),
                       items: const [
                         BottomNavigationBarItem(icon: Icon(Icons.emoji_events_rounded), label: '당첨 확인'),
-                        BottomNavigationBarItem(icon: Icon(Icons.bar_chart_rounded), label: '통계'),
                         BottomNavigationBarItem(icon: Icon(Icons.auto_awesome), label: '오늘의 행운'),
                         BottomNavigationBarItem(icon: Icon(Icons.tune_rounded), label: '맞춤 조합'),
                         BottomNavigationBarItem(icon: Icon(Icons.history_rounded), label: '보관함'),
@@ -936,10 +934,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           key: ValueKey('latest_$mode'),
         );
       case 1:
-        return StatisticsTab(
-          key: ValueKey('stats_$mode'),
-        );
-      case 2:
         return VipTab(
           key: ValueKey('vip_$mode'),
           ctrl: _birthDateCtrl,
@@ -948,7 +942,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           onBirthDateChanged: _onBirthDateChanged,
           shimmerCtrl: _shimmerCtrl,
         );
-      case 3:
+      case 2:
         return CustomTab(
           key: ValueKey('custom_$mode'),
           customNumbers: _customNumbers,
