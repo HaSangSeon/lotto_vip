@@ -139,7 +139,7 @@ class LottoBallRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasComparison = matchedNumbers != null && matchedNumbers!.isNotEmpty;
+    final hasComparison = matchedNumbers != null;
 
     return LayoutBuilder(
       builder: (context, constraints) {

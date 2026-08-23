@@ -1,6 +1,12 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
+enum LottoEntryType {
+  vipLucky, // 오늘의 VIP 행운 번호
+  custom, // 맞춤 번호 조합
+  qrScan, // 실제 구매 복권 (QR 스캔)
+}
+
 class LottoHistoryEntry {
   final String title;
   final List<int> numbers;
@@ -13,6 +19,42 @@ class LottoHistoryEntry {
     required this.createdAt,
     this.isFavorite = false,
   });
+
+  LottoEntryType get entryType {
+    if (title.contains('QR') || title.contains('스캔')) {
+      return LottoEntryType.qrScan;
+    } else if (title.contains('VIP') || title.contains('행운')) {
+      return LottoEntryType.vipLucky;
+    } else {
+      return LottoEntryType.custom;
+    }
+  }
+
+  String get typeBadgeLabel {
+    switch (entryType) {
+      case LottoEntryType.qrScan:
+        return '🎫 실물 복권';
+      case LottoEntryType.vipLucky:
+        return '👑 VIP 행운';
+      case LottoEntryType.custom:
+        return '⚙️ 맞춤 조합';
+    }
+  }
+
+  /// 번호가 속한 회차 계산 (제목에 명시된 회차 우선, 없으면 생성일 기준 공식 회차)
+  int get drawNo {
+    final match = RegExp(r'제?(\d{3,5})회').firstMatch(title);
+    if (match != null) {
+      final parsed = int.tryParse(match.group(1)!);
+      if (parsed != null && parsed > 0) return parsed;
+    }
+
+    // 1회차: 2002년 12월 7일 (토) 20:00 마감
+    final firstDrawDate = DateTime(2002, 12, 7, 20, 0, 0);
+    final diff = createdAt.difference(firstDrawDate);
+    if (diff.isNegative) return 1;
+    return (diff.inDays / 7).floor() + 1;
+  }
 
   Map<String, dynamic> toJson() => {
         'title': title,
@@ -44,7 +86,7 @@ class HistoryService {
       final entries = raw
           .map((e) => LottoHistoryEntry.fromJson(jsonDecode(e)))
           .toList();
-      
+
       // 최신 생성 순으로 내림차순 정렬 (새로 추가된 항목이 맨 위)
       entries.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return entries;
@@ -57,7 +99,7 @@ class HistoryService {
   static Future<void> save(LottoHistoryEntry entry) async {
     final currentList = await load();
     currentList.insert(0, entry); // 최신 항목 맨 앞 추가
-    
+
     if (currentList.length > _maxEntries) {
       currentList.removeRange(_maxEntries, currentList.length);
     }

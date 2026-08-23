@@ -675,7 +675,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     _buildBannerAd(),
                     BottomNavigationBar(
                       currentIndex: _selectedTab,
-                      onTap: (index) => setState(() => _selectedTab = index),
+                      onTap: (index) {
+                        setState(() => _selectedTab = index);
+                        if (index == 3) {
+                          _loadHistory();
+                        }
+                      },
                       type: BottomNavigationBarType.fixed,
                       backgroundColor: Colors.transparent,
                       elevation: 0,
@@ -962,6 +967,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           onDeleteEntry: (entry) async {
             await _loadHistory();
           },
+          onRefresh: _loadHistory,
         );
     }
   }

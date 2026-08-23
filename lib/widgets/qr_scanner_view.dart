@@ -4,9 +4,15 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../theme/app_theme.dart';
+import '../services/qr_lottery_parser.dart';
+import '../services/dhlottery_api.dart';
+import '../services/history_service.dart';
+import 'qr_result_sheet.dart';
 
 class QrScannerView extends StatefulWidget {
-  const QrScannerView({super.key});
+  final VoidCallback? onHistorySaved;
+
+  const QrScannerView({super.key, this.onHistorySaved});
 
   @override
   State<QrScannerView> createState() => _QrScannerViewState();
@@ -38,28 +44,204 @@ class _QrScannerViewState extends State<QrScannerView> {
     final List<Barcode> barcodes = capture.barcodes;
     for (final barcode in barcodes) {
       final String? code = barcode.rawValue;
-      if (code != null && (code.contains('dhlottery.co.kr') || code.contains('qr.dhlottery'))) {
+      if (code != null && code.trim().isNotEmpty) {
         _isProcessing = true;
-        _handleQrUrl(code);
+        _handleQrCode(code);
         break;
       }
     }
   }
 
-  Future<void> _handleQrUrl(String urlString) async {
+  Future<void> _handleQrCode(String rawCode) async {
+    setState(() => _isProcessing = true);
+
     try {
-      final Uri url = Uri.parse(urlString);
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
+      // 1. QR 코드 정밀 파싱 및 유효성 검사
+      final parseResult = QRLotteryParser.parseDetailed(rawCode);
+
+      if (parseResult.isSuccess) {
+        final qrData = parseResult.data!;
+
+        // 2. 해당 회차 공식 당첨 결과 조회
+        DHLotteryResult? drawResult;
+        bool isNetworkError = false;
+
+        try {
+          drawResult = await DHLotteryApi.fetchByDrawNo(qrData.drwNo);
+          // 추첨 시간이 지났는데 API 결과가 안 오는 경우 네트워크/서버 지연으로 처리
+          if (drawResult == null && qrData.isDrawnTimePassed) {
+            isNetworkError = true;
+          }
+        } catch (_) {
+          if (qrData.isDrawnTimePassed) {
+            isNetworkError = true;
+          }
+        }
+
+        // 3. 보관함(히스토리)에 스캔한 번호 안전하게 자동 저장
+        final existingHistory = await HistoryService.load();
+        for (final game in qrData.games) {
+          final alreadySaved = existingHistory.any((e) =>
+              e.numbers.length == game.numbers.length &&
+              e.numbers.every((n) => game.numbers.contains(n)) &&
+              e.title.contains('${qrData.drwNo}회') &&
+              e.title.contains(game.label));
+
+          if (!alreadySaved) {
+            await HistoryService.save(
+              LottoHistoryEntry(
+                title: '[QR스캔] 제${qrData.drwNo}회 ${game.label}게임',
+                numbers: game.numbers,
+                createdAt: DateTime.now(),
+              ),
+            );
+          }
+        }
+
+        widget.onHistorySaved?.call();
+
         if (mounted) {
-          Navigator.of(context).pop();
+          // 4. 앱 자체 프리미엄 결과 시트 표시
+          await QrResultSheet.show(
+            context,
+            qrData: qrData,
+            drawResult: drawResult,
+            isSavedToHistory: true,
+            isNetworkError: isNetworkError,
+            onRetry: () async {
+              return await DHLotteryApi.fetchByDrawNo(qrData.drwNo);
+            },
+          );
+
+          if (mounted) {
+            setState(() => _isProcessing = false);
+          }
         }
       } else {
-        _isProcessing = false;
+        // 파싱 실패 시: 오류 종류에 맞추어 친절한 예외 처리 다이얼로그 표시
+        if (mounted) {
+          _showErrorDialog(
+            errorType: parseResult.errorType ?? QRErrorType.invalidFormat,
+            errorMessage: parseResult.errorMessage ?? '올바른 로또 QR 코드가 아닙니다.',
+            rawCode: rawCode,
+          );
+        }
       }
     } catch (e) {
-      _isProcessing = false;
+      if (mounted) {
+        _showErrorDialog(
+          errorType: QRErrorType.invalidFormat,
+          errorMessage: 'QR 코드를 처리하는 도중 예상치 못한 오류가 발생했습니다.\n다시 시도해 주세요.',
+          rawCode: rawCode,
+        );
+      }
     }
+  }
+
+  /// 예외 상황 전용 친절한 다이얼로그
+  void _showErrorDialog({
+    required QRErrorType errorType,
+    required String errorMessage,
+    required String rawCode,
+  }) {
+    final isPension = errorType == QRErrorType.pensionLottery;
+    final isHttpUrl = rawCode.startsWith('http://') || rawCode.startsWith('https://');
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Row(
+          children: [
+            Icon(
+              isPension ? Icons.info_outline_rounded : Icons.warning_amber_rounded,
+              color: isPension ? AppColors.gold : Colors.amber.shade700,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              isPension ? '연금복권 QR 감지' : 'QR 코드 확인 필요',
+              style: GoogleFonts.notoSansKr(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              errorMessage,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.isLight ? Colors.grey.shade100 : Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.borderSubtle),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.qr_code_2_rounded, size: 18, color: AppColors.gold),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '로또 6/45 복권 용지 우측 상단의 QR 코드를 사각형 안에 맞춰주세요.',
+                      style: GoogleFonts.notoSansKr(fontSize: 11, color: AppColors.textSecondary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          if (isHttpUrl)
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                try {
+                  final uri = Uri.parse(rawCode);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                } catch (_) {}
+                if (mounted) setState(() => _isProcessing = false);
+              },
+              child: Text(
+                '웹브라우저로 열기',
+                style: GoogleFonts.notoSansKr(color: AppColors.textSecondary, fontSize: 13),
+              ),
+            ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() => _isProcessing = false);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.isLight ? AppColors.goldDark : AppColors.gold,
+              foregroundColor: AppColors.isLight ? Colors.white : Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text(
+              '다시 스캔하기',
+              style: GoogleFonts.notoSansKr(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showManualInputDialog() {
@@ -85,7 +267,7 @@ class _QrScannerViewState extends State<QrScannerView> {
               ),
               const SizedBox(height: 8),
               Text(
-                '로또 용지의 QR 코드 URL을 직접 입력하여 당첨을 확인할 수 있습니다.',
+                '로또 용지의 QR 코드 URL 또는 파라미터(v=...)를 직접 입력하여 당첨을 확인할 수 있습니다.',
                 style: GoogleFonts.notoSansKr(
                   fontSize: 12,
                   color: AppColors.textSecondary,
@@ -95,7 +277,7 @@ class _QrScannerViewState extends State<QrScannerView> {
               TextField(
                 controller: urlCtrl,
                 decoration: InputDecoration(
-                  hintText: 'https://m.dhlottery.co.kr/qr.do?...',
+                  hintText: 'https://m.dhlottery.co.kr/qr.do?method=winQr&v=...',
                   hintStyle: GoogleFonts.notoSansKr(fontSize: 12, color: AppColors.textHint),
                 ),
                 style: GoogleFonts.notoSansKr(fontSize: 13, color: AppColors.textPrimary),
@@ -114,7 +296,7 @@ class _QrScannerViewState extends State<QrScannerView> {
                       final input = urlCtrl.text.trim();
                       if (input.isNotEmpty) {
                         Navigator.pop(ctx);
-                        _handleQrUrl(input);
+                        _handleQrCode(input);
                       }
                     },
                     style: ElevatedButton.styleFrom(
@@ -172,7 +354,7 @@ class _QrScannerViewState extends State<QrScannerView> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // 카메라 스캐너 (화면 전체 꽉 차게 레아아웃 보정)
+            // 카메라 스캐너
             Positioned.fill(
               child: MobileScanner(
                 controller: _controller,
@@ -323,6 +505,31 @@ class _QrScannerViewState extends State<QrScannerView> {
                 ],
               ),
             ),
+
+            // 처리 중 로딩 인디케이터 오버레이
+            if (_isProcessing)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.75),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(color: AppColors.gold),
+                        const SizedBox(height: 16),
+                        Text(
+                          '당첨 결과 확인 및 번호 저장 중...',
+                          style: GoogleFonts.notoSansKr(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
