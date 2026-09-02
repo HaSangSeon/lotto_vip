@@ -308,16 +308,28 @@ class _NotificationSettingsDialogState
               ),
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
 
-            // 닫기 버튼
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                '닫기',
-                style: GoogleFonts.notoSansKr(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
+            // 닫기 버튼 (프리미엄 라운드 버튼)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.isLight ? AppColors.goldDark : AppColors.gold,
+                  foregroundColor: AppColors.isLight ? Colors.white : Colors.black,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                ),
+                child: Text(
+                  '닫기',
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),

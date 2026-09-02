@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/safe_google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -58,80 +59,299 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
 
   void _showDrawSelectDialog() {
     if (_latestDrwNo == null) return;
+    final isLight = AppColors.isLight;
     final controller = TextEditingController(text: _result?.drwNo.toString() ?? '');
+    String? errorText;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          '회차 직접 선택',
-          style: GoogleFonts.notoSansKr(
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-            fontSize: 18,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          void submit() {
+            final val = int.tryParse(controller.text.trim());
+            if (val != null && val >= 1 && val <= _latestDrwNo!) {
+              Navigator.pop(ctx);
+              _fetchData(val);
+            } else {
+              setDialogState(() {
+                errorText = '1 ~ $_latestDrwNo 사이의 숫자를 입력해 주세요.';
+              });
+            }
+          }
+
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: isLight
+                      ? AppColors.lightGoldBorder.withValues(alpha: 0.7)
+                      : AppColors.borderGold,
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isLight ? 0.08 : 0.4),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 상단 헤더 (아이콘 + 타이틀 + 닫기 버튼)
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: (isLight ? AppColors.goldDeep : AppColors.gold)
+                              .withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.edit_calendar_rounded,
+                          size: 18,
+                          color: isLight ? AppColors.goldDeep : AppColors.gold,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '회차 직접 선택',
+                              style: GoogleFonts.notoSansKr(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                                fontSize: 16.5,
+                              ),
+                            ),
+                            Text(
+                              '1회 ~ 최신 $_latestDrwNo회 조회',
+                              style: GoogleFonts.notoSansKr(
+                                fontSize: 11.5,
+                                color: AppColors.textHint,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        color: AppColors.textSecondary,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+                  Divider(
+                    height: 1,
+                    color: isLight
+                        ? Colors.black.withValues(alpha: 0.06)
+                        : Colors.white.withValues(alpha: 0.08),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 빠른 선택 칩
+                  Row(
+                    children: [
+                      _buildQuickChip('최신 회차', isLight, () {
+                        controller.text = _latestDrwNo.toString();
+                        setDialogState(() => errorText = null);
+                      }),
+                      const SizedBox(width: 6),
+                      _buildQuickChip('1,000회', isLight, () {
+                        controller.text = '1000';
+                        setDialogState(() => errorText = null);
+                      }),
+                      const SizedBox(width: 6),
+                      _buildQuickChip('1,200회', isLight, () {
+                        controller.text = '1200';
+                        setDialogState(() => errorText = null);
+                      }),
+                      const SizedBox(width: 6),
+                      _buildQuickChip('1회', isLight, () {
+                        controller.text = '1';
+                        setDialogState(() => errorText = null);
+                      }),
+                    ],
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // 회차 입력 필드
+                  TextField(
+                    controller: controller,
+                    keyboardType: TextInputType.number,
+                    autofocus: true,
+                    textAlign: TextAlign.center,
+                    onSubmitted: (_) => submit(),
+                    onChanged: (_) {
+                      if (errorText != null) {
+                        setDialogState(() => errorText = null);
+                      }
+                    },
+                    style: GoogleFonts.rajdhani(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: isLight ? AppColors.goldDeep : AppColors.gold,
+                      letterSpacing: 1.5,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: '회차 번호 입력',
+                      hintStyle: GoogleFonts.notoSansKr(
+                        fontSize: 14,
+                        color: AppColors.textHint,
+                        letterSpacing: 0,
+                      ),
+                      suffixText: '회',
+                      suffixStyle: GoogleFonts.notoSansKr(
+                        color: isLight ? AppColors.goldDeep : AppColors.gold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                      filled: true,
+                      fillColor: isLight
+                          ? const Color(0xFFF9F7F2)
+                          : Colors.white.withValues(alpha: 0.04),
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: isLight
+                              ? AppColors.lightGoldBorder.withValues(alpha: 0.5)
+                              : AppColors.borderGold.withValues(alpha: 0.3),
+                          width: 1.2,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: isLight ? AppColors.goldDeep : AppColors.gold,
+                          width: 1.8,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  if (errorText != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      errorText!,
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 11.5,
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+
+                  const SizedBox(height: 20),
+
+                  // 하단 버튼 영역 (취소 / 조회)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.textSecondary,
+                            side: BorderSide(
+                              color: isLight
+                                  ? Colors.grey.shade300
+                                  : Colors.white.withValues(alpha: 0.15),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: Text(
+                            '취소',
+                            style: GoogleFonts.notoSansKr(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: submit,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isLight
+                                ? AppColors.goldDark
+                                : AppColors.gold,
+                            foregroundColor:
+                                isLight ? Colors.white : Colors.black,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: Text(
+                            '조회하기',
+                            style: GoogleFonts.notoSansKr(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildQuickChip(String label, bool isLight, VoidCallback onTap) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isLight
+                ? Colors.black.withValues(alpha: 0.03)
+                : Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isLight
+                  ? Colors.black.withValues(alpha: 0.06)
+                  : Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          child: Text(
+            label,
+            style: GoogleFonts.notoSansKr(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '조회할 회차를 입력하세요 (1 ~ $_latestDrwNo회)',
-              style: GoogleFonts.notoSansKr(fontSize: 13, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              autofocus: true,
-              style: GoogleFonts.rajdhani(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-              decoration: InputDecoration(
-                hintText: '예: 1158',
-                hintStyle: GoogleFonts.rajdhani(color: AppColors.textHint),
-                suffixText: '회',
-                suffixStyle: GoogleFonts.notoSansKr(color: AppColors.textSecondary, fontWeight: FontWeight.bold),
-                filled: true,
-                fillColor: AppColors.isLight ? Colors.grey.shade100 : Colors.white.withValues(alpha: 0.05),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: AppColors.borderGold),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: AppColors.gold, width: 2),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('취소', style: GoogleFonts.notoSansKr(color: AppColors.textHint)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final val = int.tryParse(controller.text.trim());
-              if (val != null && val >= 1 && val <= _latestDrwNo!) {
-                Navigator.pop(ctx);
-                _fetchData(val);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.gold,
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: Text('조회', style: GoogleFonts.notoSansKr(fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }
@@ -189,43 +409,96 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
     final formatCurrency = NumberFormat.currency(locale: 'ko_KR', symbol: '₩', decimalDigits: 0);
     final result = _result!;
     final isRollover = result.isRollover;
+    final isLight = AppColors.isLight;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      child: Column(
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: isLight
+              ? [
+                  const Color(0xFFFBF8F2),
+                  const Color(0xFFF4ECE1),
+                  const Color(0xFFEFE6D6),
+                ]
+              : [
+                  const Color(0xFF10131E),
+                  const Color(0xFF0C0E16),
+                  const Color(0xFF08090E),
+                ],
+        ),
+      ),
+      child: Stack(
         children: [
-          // 이월 배너 (1등 당첨자 없을 때)
-          if (isRollover) ...[
-            _buildRolloverBanner(),
-            const SizedBox(height: 16),
-          ],
-
-          // 메인 당첨 카드
-          GlassCard(
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 18),
-            borderColor: AppColors.borderGold,
+          // 상단 은은한 앰비언트 골드 오로라 글로우 효과
+          Positioned(
+            top: -60,
+            left: 0,
+            right: 0,
+            height: 280,
+            child: IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.topCenter,
+                    radius: 1.15,
+                    colors: isLight
+                        ? [
+                            AppColors.gold.withValues(alpha: 0.22),
+                            AppColors.gold.withValues(alpha: 0.06),
+                            Colors.transparent,
+                          ]
+                        : [
+                            AppColors.gold.withValues(alpha: 0.14),
+                            const Color(0xFF6C3FC5).withValues(alpha: 0.08),
+                            Colors.transparent,
+                          ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             child: Column(
               children: [
-                // 회차 네비게이션 헤더 & 추첨일
-                _buildDrawHeader(result),
-                const SizedBox(height: 18),
+                // 이월 배너 (1등 당첨자 없을 때)
+                if (isRollover) ...[
+                  _buildRolloverBanner(),
+                  const SizedBox(height: 16),
+                ],
 
-                // 당첨 번호 & 보너스 번호 프리미엄 쇼케이스
-                _buildWinningNumbersShowcase(result),
-                const SizedBox(height: 18),
+                // 메인 당첨 카드
+                GlassCard(
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 18),
+                  borderColor: AppColors.borderGold,
+                  child: Column(
+                    children: [
+                      // 회차 네비게이션 헤더 & 추첨일
+                      _buildDrawHeader(result),
+                      const SizedBox(height: 18),
 
-                // 당첨금 및 주요 내역 섹션
-                _buildPrizeSection(result, isRollover, formatCurrency),
+                      // 당첨 번호 & 보너스 번호 프리미엄 쇼케이스
+                      _buildWinningNumbersShowcase(result),
+                      const SizedBox(height: 18),
+
+                      // 당첨금 및 주요 내역 섹션
+                      _buildPrizeSection(result, isRollover, formatCurrency),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // 역대 누적 통계 분석 (HOT & COLD)
+                _buildStatisticsSection(),
+
+                const SizedBox(height: 16),
               ],
             ),
           ),
-
-          const SizedBox(height: 20),
-
-          // 역대 누적 통계 분석 (HOT & COLD)
-          _buildStatisticsSection(),
-
-          const SizedBox(height: 16),
         ],
       ),
     );
@@ -509,17 +782,17 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
                     Text(
                       '제 ${result.drwNo}회',
                       style: GoogleFonts.rajdhani(
-                        color: AppColors.isLight ? AppColors.goldDeep : AppColors.gold,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.goldText,
                         letterSpacing: 0.5,
                       ),
                     ),
                     const SizedBox(width: 6),
                     Icon(
-                      Icons.arrow_drop_down_circle_outlined,
-                      size: 16,
-                      color: AppColors.isLight ? AppColors.goldDeep : AppColors.gold,
+                      Icons.edit_calendar_rounded,
+                      size: 15,
+                      color: AppColors.goldText.withValues(alpha: 0.8),
                     ),
                   ],
                 ),
@@ -539,14 +812,14 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
           ],
         ),
 
-        // 과거 회차일 때 최신 회차 복귀 버튼
-        if (_latestDrwNo != null && result.drwNo != _latestDrwNo!) ...[
-          const SizedBox(height: 8),
+        // 최신 회차가 아닐 때 "최신 회차로 바로가기" 버튼
+        if (_latestDrwNo != null && result.drwNo < _latestDrwNo!) ...[
+          const SizedBox(height: 6),
           InkWell(
-            onTap: () => _fetchData(_latestDrwNo),
+            onTap: () => _fetchData(_latestDrwNo!),
             borderRadius: BorderRadius.circular(12),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.gold.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
@@ -691,34 +964,46 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
   Widget _buildPrizeSection(DHLotteryResult result, bool isRollover, NumberFormat fmt) {
     final isLight = AppColors.isLight;
     final hasTypeData = result.winTypeAuto > 0 || result.winTypeManual > 0 || result.winTypeSemi > 0;
+    final firstWinAmount = isRollover ? result.firstSumWinamnt : result.firstWinamnt;
+    final approxBillions = (firstWinAmount / 100000000).toStringAsFixed(1);
+    final totalApproxBillions = (result.firstSumWinamnt / 100000000).toStringAsFixed(1);
 
     return Column(
       children: [
-        // 1. 1등 당첨금 메인 하이라이트 카드
+        // 1. 1등 당첨금 메인 하이라이트 카드 (Hero Prize Card)
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 18),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: isRollover
-                  ? [const Color(0xFFFF6B35).withValues(alpha: 0.15), const Color(0xFFFF8C42).withValues(alpha: 0.08)]
+                  ? [
+                      const Color(0xFFFF6B35).withValues(alpha: 0.15),
+                      const Color(0xFFFF8C42).withValues(alpha: 0.08)
+                    ]
                   : (isLight
-                      ? [const Color(0xFFFFF9E6), const Color(0xFFFFF0CC)]
-                      : [AppColors.gold.withValues(alpha: 0.16), AppColors.goldDark.withValues(alpha: 0.06)]),
+                      ? [
+                          const Color(0xFFFFFBF0),
+                          const Color(0xFFFFF5D9),
+                        ]
+                      : [
+                          AppColors.gold.withValues(alpha: 0.18),
+                          AppColors.goldDark.withValues(alpha: 0.08),
+                        ]),
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isRollover
-                  ? const Color(0xFFFF6B35).withValues(alpha: 0.4)
-                  : (isLight ? AppColors.lightGoldBorder.withValues(alpha: 0.6) : AppColors.borderGold),
-              width: 1.2,
+                  ? const Color(0xFFFF6B35).withValues(alpha: 0.45)
+                  : (isLight ? const Color(0xFFE2B747).withValues(alpha: 0.6) : AppColors.gold.withValues(alpha: 0.45)),
+              width: 1.3,
             ),
             boxShadow: [
               BoxShadow(
-                color: (isRollover ? const Color(0xFFFF6B35) : AppColors.gold).withValues(alpha: 0.1),
-                blurRadius: 14,
+                color: (isRollover ? const Color(0xFFFF6B35) : AppColors.gold).withValues(alpha: isLight ? 0.08 : 0.14),
+                blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
             ],
@@ -726,262 +1011,291 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 상단 라벨 & 당첨자 수 뱃지
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        isRollover ? Icons.savings_rounded : Icons.emoji_events_rounded,
-                        color: isRollover
-                            ? const Color(0xFFE85D00)
-                            : (isLight ? AppColors.goldDeep : AppColors.gold),
-                        size: 18,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isRollover ? '이월 누적 적립금' : '1등 당첨금 (1인당)',
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: isRollover
+                              ? const Color(0xFFFF6B35).withValues(alpha: 0.2)
+                              : (isLight ? const Color(0xFFFFE8A3) : AppColors.gold.withValues(alpha: 0.2)),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isRollover ? Icons.savings_rounded : Icons.emoji_events_rounded,
                           color: isRollover
                               ? const Color(0xFFE85D00)
                               : (isLight ? AppColors.goldDeep : AppColors.gold),
+                          size: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isRollover ? '이월 누적 적립금' : '1등 당첨금 (1인당)',
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: isRollover
+                              ? const Color(0xFFE85D00)
+                              : (isLight ? AppColors.goldDeep : AppColors.goldLight),
+                          letterSpacing: -0.2,
                         ),
                       ),
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                     decoration: BoxDecoration(
                       color: isRollover
                           ? const Color(0xFFE85D00).withValues(alpha: 0.15)
-                          : (isLight ? AppColors.goldDeep : AppColors.gold).withValues(alpha: 0.2),
+                          : (isLight ? const Color(0xFFE8F8F5) : const Color(0xFF2ECC71).withValues(alpha: 0.2)),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isRollover
+                            ? const Color(0xFFE85D00).withValues(alpha: 0.3)
+                            : (isLight ? const Color(0xFF2ECC71).withValues(alpha: 0.5) : const Color(0xFF2ECC71).withValues(alpha: 0.5)),
+                        width: 0.9,
+                      ),
                     ),
                     child: Text(
                       isRollover ? '당첨자 없음' : '🎯 ${result.firstWinCount}명 당첨',
                       style: GoogleFonts.notoSansKr(
-                        fontSize: 11,
+                        fontSize: 11.5,
                         fontWeight: FontWeight.w800,
                         color: isRollover
                             ? const Color(0xFFE85D00)
-                            : (isLight ? AppColors.goldDeep : AppColors.goldLight),
+                            : (isLight ? const Color(0xFF145A32) : const Color(0xFFA9DFBF)),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    isRollover ? fmt.format(result.firstSumWinamnt) : fmt.format(result.firstWinamnt),
-                    style: GoogleFonts.rajdhani(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                      color: isRollover
-                          ? const Color(0xFFE85D00)
-                          : (isLight ? AppColors.goldDeep : AppColors.gold),
-                    ),
+
+              const SizedBox(height: 12),
+
+              // 중앙 메인 금액 (FittedBox로 자동 줄바꿈 원천 차단)
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  fmt.format(firstWinAmount),
+                  style: GoogleFonts.rajdhani(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                    height: 1.05,
+                    color: isRollover
+                        ? const Color(0xFFE85D00)
+                        : (isLight ? const Color(0xFF7A4F01) : const Color(0xFFFFD700)),
                   ),
-                  if (!isRollover && result.firstWinamnt >= 100000000) ...[
+                ),
+              ),
+
+              if (!isRollover && firstWinAmount >= 100000000) ...[
+                const SizedBox(height: 9),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isLight ? const Color(0xFFFFEECC) : AppColors.gold.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isLight ? const Color(0xFFE2B747).withValues(alpha: 0.6) : AppColors.gold.withValues(alpha: 0.35),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Text(
+                        '약 $approxBillions억 원',
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: isLight ? const Color(0xFF7A4F01) : AppColors.goldLight,
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: 8),
-                    Text(
-                      '(약 ${(result.firstWinamnt / 100000000).toStringAsFixed(1)}억 원)',
-                      style: GoogleFonts.notoSansKr(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
+                    Expanded(
+                      child: Text(
+                        '총 ${result.firstWinCount}명에게 각 $approxBillions억 원씩 균등 지급',
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 11.5,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
-                ],
-              ),
+                ),
+              ],
             ],
           ),
         ),
 
         const SizedBox(height: 12),
 
-        // 2. 주요 내역 2분할 카드 (IntrinsicHeight로 높이 및 정렬 완벽 일치)
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+        // 2. 통합 주요 내역 카드 (1등 총 당첨금 + 1등 배출 방식 단일 일체형 카드)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 18),
+          decoration: BoxDecoration(
+            color: isLight ? Colors.white : const Color(0xFF131724),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isLight
+                  ? AppColors.lightGoldBorder.withValues(alpha: 0.35)
+                  : AppColors.borderGold.withValues(alpha: 0.2),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isLight ? 0.03 : 0.15),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
             children: [
-              // 1등 총 당첨금 카드
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: isLight ? const Color(0xFFFBF9F4) : const Color(0xFF131724),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isLight
-                          ? AppColors.lightGoldBorder.withValues(alpha: 0.35)
-                          : AppColors.borderGold.withValues(alpha: 0.2),
-                      width: 1,
+              // 1행: 1등 총 당첨금
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: AppColors.gold.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: isLight ? 0.02 : 0.15),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    child: Icon(
+                      Icons.account_balance_wallet_rounded,
+                      size: 14,
+                      color: isLight ? AppColors.goldDeep : AppColors.gold,
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  const SizedBox(width: 8),
+                  Text(
+                    '1등 총 당첨금',
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              color: AppColors.gold.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.account_balance_wallet_rounded,
-                              size: 14,
-                              color: isLight ? AppColors.goldDeep : AppColors.gold,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '1등 총 당첨금',
-                            style: GoogleFonts.notoSansKr(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
                       Text(
                         fmt.format(result.firstSumWinamnt),
                         style: GoogleFonts.rajdhani(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
                           color: isLight ? const Color(0xFF2C2520) : Colors.white,
                           letterSpacing: 0.3,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-
-              // 1등 배출 방식 (자동/수동/반자동) 카드
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: isLight ? const Color(0xFFFBF9F4) : const Color(0xFF131724),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isLight
-                          ? AppColors.lightGoldBorder.withValues(alpha: 0.35)
-                          : AppColors.borderGold.withValues(alpha: 0.2),
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: isLight ? 0.02 : 0.15),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              color: isLight ? const Color(0xFFE8F0FE) : const Color(0xFF1E293B),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              Icons.tune_rounded,
-                              size: 14,
-                              color: isLight ? const Color(0xFF1967D2) : const Color(0xFF8AB4F8),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '1등 배출 방식',
-                            style: GoogleFonts.notoSansKr(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      if (hasTypeData)
-                        Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          children: [
-                            _buildMiniTypeBadge('자동', result.winTypeAuto, const Color(0xFF1976D2)),
-                            _buildMiniTypeBadge('수동', result.winTypeManual, const Color(0xFF2E7D32)),
-                            if (result.winTypeSemi > 0)
-                              _buildMiniTypeBadge('반자동', result.winTypeSemi, const Color(0xFF7B1FA2)),
-                          ],
-                        )
-                      else
+                      if (result.firstSumWinamnt >= 100000000) ...[
+                        const SizedBox(height: 1),
                         Text(
-                          '구분 미제공',
+                          '총 약 $totalApproxBillions억 원',
                           style: GoogleFonts.notoSansKr(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
                             color: AppColors.textHint,
                           ),
                         ),
+                      ],
                     ],
                   ),
+                ],
+              ),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Divider(
+                  height: 1,
+                  thickness: 0.8,
+                  color: isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.08),
                 ),
+              ),
+
+              // 2행: 1등 배출 방식
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: isLight ? const Color(0xFFE8F0FE) : const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.tune_rounded,
+                      size: 14,
+                      color: isLight ? const Color(0xFF1967D2) : const Color(0xFF8AB4F8),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '1등 배출 방식',
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (hasTypeData)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildMiniTypeBadge('자동', result.winTypeAuto, const Color(0xFF1976D2)),
+                        const SizedBox(width: 6),
+                        _buildMiniTypeBadge('수동', result.winTypeManual, const Color(0xFF2E7D32)),
+                        if (result.winTypeSemi > 0) ...[
+                          const SizedBox(width: 6),
+                          _buildMiniTypeBadge('반자동', result.winTypeSemi, const Color(0xFF7B1FA2)),
+                        ],
+                      ],
+                    )
+                  else
+                    Text(
+                      '구분 미제공',
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textHint,
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
         // 3. 1등 당첨 판매점(지역) 목록 확인 버튼
         SizedBox(
           width: double.infinity,
           child: Container(
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isLight
-                    ? [const Color(0xFFFFF3E0), const Color(0xFFFFE0B2)]
-                    : [const Color(0xFFE65100).withValues(alpha: 0.22), const Color(0xFFFF8F00).withValues(alpha: 0.12)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: isLight ? const Color(0xFFFFF8EE) : const Color(0xFF1E1A17),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: isLight
-                    ? const Color(0xFFFF9800).withValues(alpha: 0.5)
+                    ? const Color(0xFFFFB74D).withValues(alpha: 0.6)
                     : const Color(0xFFFF9800).withValues(alpha: 0.35),
                 width: 1.2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFF9800).withValues(alpha: 0.08),
-                  blurRadius: 8,
+                  color: Colors.black.withValues(alpha: isLight ? 0.02 : 0.1),
+                  blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
               ],
@@ -989,20 +1303,20 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () => _openWinningStores(result.drwNo),
+                onTap: () => _showWinningStoresModal(context, result.drwNo),
                 borderRadius: BorderRadius.circular(16),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
                         padding: const EdgeInsets.all(5),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE65100).withValues(alpha: 0.15),
+                          color: const Color(0xFFE65100).withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.location_on_rounded, size: 16, color: Color(0xFFE65100)),
+                        child: const Icon(Icons.location_on_rounded, size: 15, color: Color(0xFFE65100)),
                       ),
                       const SizedBox(width: 8),
                       Text(
@@ -1010,14 +1324,14 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
                         style: GoogleFonts.notoSansKr(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: isLight ? const Color(0xFFBF360C) : const Color(0xFFFFB74D),
+                          color: isLight ? const Color(0xFFC04B00) : const Color(0xFFFFB74D),
                         ),
                       ),
                       const SizedBox(width: 4),
                       Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 12,
-                        color: isLight ? const Color(0xFFBF360C) : const Color(0xFFFFB74D),
+                        Icons.chevron_right_rounded,
+                        size: 16,
+                        color: isLight ? const Color(0xFFC04B00) : const Color(0xFFFFB74D),
                       ),
                     ],
                   ),
@@ -1042,6 +1356,13 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
                     : AppColors.borderGold.withValues(alpha: 0.3),
                 width: 1.2,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isLight ? 0.02 : 0.1),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Material(
               color: Colors.transparent,
@@ -1049,14 +1370,21 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
                 onTap: () => _showWinningDetailModal(context, result, fmt),
                 borderRadius: BorderRadius.circular(16),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.analytics_outlined,
-                        size: 17,
-                        color: isLight ? AppColors.goldDeep : AppColors.gold,
+                      Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: (isLight ? AppColors.goldDeep : AppColors.gold).withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.analytics_outlined,
+                          size: 15,
+                          color: isLight ? AppColors.goldDeep : AppColors.gold,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Text(
@@ -1087,10 +1415,10 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
   Widget _buildMiniTypeBadge(String label, int count, Color color) {
     final isLight = AppColors.isLight;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: isLight ? 0.1 : 0.18),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(7),
         border: Border.all(
           color: color.withValues(alpha: isLight ? 0.3 : 0.4),
           width: 0.9,
@@ -1362,39 +1690,9 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-              // 1등 배출 판매점(지역) 목록 확인 버튼
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _openWinningStores(result.drwNo),
-                  icon: const Icon(Icons.location_on_rounded, size: 18, color: Color(0xFFE65100)),
-                  label: Text(
-                    '📍 제 ${result.drwNo}회 1등 당첨 판매점(지역) 목록 확인',
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.isLight ? const Color(0xFFE65100) : const Color(0xFFFF9800),
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    side: BorderSide(
-                      color: (AppColors.isLight ? const Color(0xFFE65100) : const Color(0xFFFF9800))
-                          .withValues(alpha: 0.5),
-                      width: 1.2,
-                    ),
-                    backgroundColor: (AppColors.isLight ? const Color(0xFFFFE0B2) : const Color(0xFFE65100))
-                        .withValues(alpha: 0.12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              // 확인 버튼
+              // 확인 닫기 버튼
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -1415,18 +1713,455 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
     );
   }
 
-  Future<void> _openWinningStores(int drwNo) async {
-    // 동행복권 모바일 당첨 판매점 조회 페이지 (개편 신규 URL)
-    final uri = Uri.parse('https://m.dhlottery.co.kr/wnprchsplcsrch/home');
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-      }
-    } catch (e) {
-      debugPrint('Error launching winning stores: $e');
-    }
+  void _showWinningStoresModal(BuildContext context, int drwNo) {
+    final isLight = AppColors.isLight;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        String filter = '전체';
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.85,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                border: Border.all(
+                  color: isLight ? AppColors.lightGoldBorder.withValues(alpha: 0.5) : AppColors.borderGold,
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, -5),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  // 상단 드래그 핸들
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isLight ? Colors.grey.shade300 : Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // 모달 헤더 (아이콘 + 타이틀 + 닫기 버튼)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE65100).withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.location_on_rounded, size: 20, color: Color(0xFFE65100)),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '제 $drwNo회 1등 당첨 판매점',
+                              style: GoogleFonts.notoSansKr(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              '동행복권 공식 1등 배출점 목록',
+                              style: GoogleFonts.notoSansKr(
+                                fontSize: 12,
+                                color: AppColors.textHint,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          color: AppColors.textSecondary,
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+                  Divider(
+                    height: 1,
+                    color: isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.08),
+                  ),
+
+                  // 판매점 비동기 데이터 목록
+                  Expanded(
+                    child: FutureBuilder<List<DHLotteryWinningStore>>(
+                      future: DHLotteryApi.fetchWinningStores(drwNo),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const CircularProgressIndicator(color: AppColors.gold),
+                                const SizedBox(height: 16),
+                                Text(
+                                  '제 $drwNo회 1등 판매점을 불러오는 중...',
+                                  style: GoogleFonts.notoSansKr(
+                                    fontSize: 13,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        if (snapshot.hasError || snapshot.data == null || snapshot.data!.isEmpty) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.storefront_outlined, size: 48, color: AppColors.textHint),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    '1등 판매점 정보를 불러올 수 없습니다.',
+                                    style: GoogleFonts.notoSansKr(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '아직 집계 중이거나 네트워크 연결 상태를 확인해 주세요.',
+                                    style: GoogleFonts.notoSansKr(
+                                      fontSize: 12,
+                                      color: AppColors.textHint,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton.icon(
+                                    onPressed: () async {
+                                      final uri = Uri.parse(
+                                        'https://www.dhlottery.co.kr/gameResult.do?method=byWin',
+                                      );
+                                      try {
+                                        if (await canLaunchUrl(uri)) {
+                                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                        }
+                                      } catch (_) {}
+                                    },
+                                    icon: const Icon(Icons.open_in_new_rounded, size: 15),
+                                    label: Text(
+                                      '동행복권 공식 웹에서 확인하기',
+                                      style: GoogleFonts.notoSansKr(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: isLight ? AppColors.goldDark : AppColors.gold,
+                                      foregroundColor: isLight ? Colors.white : Colors.black,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                      elevation: 0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+
+                        final allStores = snapshot.data!;
+                        final filteredStores = filter == '전체'
+                            ? allStores
+                            : allStores.where((s) => s.winType == filter).toList();
+
+                        final autoCount = allStores.where((s) => s.winType == '자동').length;
+                        final manualCount = allStores.where((s) => s.winType == '수동').length;
+                        final semiCount = allStores.where((s) => s.winType == '반자동').length;
+
+                        return Column(
+                          children: [
+                            // 상단 필터 칩 (전체, 자동, 수동, 반자동)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                              child: Row(
+                                children: [
+                                  _buildFilterChip('전체', allStores.length, filter == '전체', isLight, () {
+                                    setModalState(() => filter = '전체');
+                                  }),
+                                  const SizedBox(width: 6),
+                                  _buildFilterChip('자동', autoCount, filter == '자동', isLight, () {
+                                    setModalState(() => filter = '자동');
+                                  }, activeColor: const Color(0xFF1976D2)),
+                                  const SizedBox(width: 6),
+                                  _buildFilterChip('수동', manualCount, filter == '수동', isLight, () {
+                                    setModalState(() => filter = '수동');
+                                  }, activeColor: const Color(0xFF2E7D32)),
+                                  if (semiCount > 0) ...[
+                                    const SizedBox(width: 6),
+                                    _buildFilterChip('반자동', semiCount, filter == '반자동', isLight, () {
+                                      setModalState(() => filter = '반자동');
+                                    }, activeColor: const Color(0xFF7B1FA2)),
+                                  ],
+                                ],
+                              ),
+                            ),
+
+                            // 판매점 리스트
+                            Expanded(
+                              child: ListView.separated(
+                                padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                                itemCount: filteredStores.length,
+                                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                                itemBuilder: (context, idx) {
+                                  final store = filteredStores[idx];
+                                  final Color typeColor = store.winType == '수동'
+                                      ? const Color(0xFF2E7D32)
+                                      : (store.winType == '반자동'
+                                          ? const Color(0xFF7B1FA2)
+                                          : const Color(0xFF1976D2));
+
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: isLight ? const Color(0xFFFBF9F4) : AppColors.cardHover,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: isLight ? Colors.black.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.06),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // 1열: [좌측: 순번 + 상호명] - [중앙: 배출방식] - [우측: 주소 복사 버튼]
+                                        Row(
+                                          children: [
+                                            // 좌측: 순번 + 상호명
+                                            Expanded(
+                                              flex: 5,
+                                              child: Row(
+                                                children: [
+                                                  Container(
+                                                    width: 22,
+                                                    height: 22,
+                                                    alignment: Alignment.center,
+                                                    decoration: BoxDecoration(
+                                                      color: (isLight ? AppColors.goldDeep : AppColors.gold).withValues(alpha: 0.12),
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: Text(
+                                                      '${idx + 1}',
+                                                      style: GoogleFonts.rajdhani(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w800,
+                                                        color: isLight ? AppColors.goldDeep : AppColors.gold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      store.name,
+                                                      style: GoogleFonts.notoSansKr(
+                                                        fontSize: 14,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: AppColors.textPrimary,
+                                                      ),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+
+                                            // 중앙: 배출 유형 뱃지 (자동 / 수동 / 반자동)
+                                            Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: typeColor.withValues(alpha: isLight ? 0.12 : 0.22),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color: typeColor.withValues(alpha: 0.4),
+                                                    width: 0.8,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  store.winType,
+                                                  style: GoogleFonts.notoSansKr(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: typeColor,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+
+                                            // 우측: 주소 복사 버튼 (아이콘 + 텍스트 명시)
+                                            Expanded(
+                                              flex: 3,
+                                              child: Align(
+                                                alignment: Alignment.centerRight,
+                                                child: InkWell(
+                                                  onTap: () {
+                                                    Clipboard.setData(ClipboardData(text: store.address));
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      SnackBar(
+                                                        content: Text('${store.name} 주소가 복사되었습니다.'),
+                                                        duration: const Duration(seconds: 2),
+                                                        behavior: SnackBarBehavior.floating,
+                                                      ),
+                                                    );
+                                                  },
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.5),
+                                                    decoration: BoxDecoration(
+                                                      color: isLight ? Colors.black.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.08),
+                                                      borderRadius: BorderRadius.circular(8),
+                                                      border: Border.all(
+                                                        color: isLight ? Colors.black.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.15),
+                                                        width: 0.8,
+                                                      ),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(Icons.copy_rounded, size: 11, color: AppColors.textSecondary),
+                                                        const SizedBox(width: 4),
+                                                        Text(
+                                                          '주소 복사',
+                                                          style: GoogleFonts.notoSansKr(
+                                                            fontSize: 10.5,
+                                                            fontWeight: FontWeight.w600,
+                                                            color: AppColors.textSecondary,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+
+                                        const SizedBox(height: 8),
+
+                                        // 2열: 도로명 상세 주소
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 30),
+                                          child: Row(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Icon(Icons.place_outlined, size: 13, color: AppColors.textHint),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  store.address,
+                                                  style: GoogleFonts.notoSansKr(
+                                                    fontSize: 12,
+                                                    color: AppColors.textSecondary,
+                                                    height: 1.35,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterChip(
+    String label,
+    int count,
+    bool isSelected,
+    bool isLight,
+    VoidCallback onTap, {
+    Color? activeColor,
+  }) {
+    final effectiveColor = activeColor ?? (isLight ? AppColors.goldDeep : AppColors.gold);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? effectiveColor.withValues(alpha: isLight ? 0.12 : 0.22)
+              : (isLight ? Colors.black.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.05)),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? effectiveColor : Colors.transparent,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? effectiveColor : AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '$count',
+              style: GoogleFonts.rajdhani(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: isSelected ? effectiveColor : AppColors.textHint,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildTypeCard(String title, String count, Color accentColor) {

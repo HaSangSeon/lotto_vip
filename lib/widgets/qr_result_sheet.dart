@@ -179,7 +179,11 @@ class _QrResultSheetState extends State<QrResultSheet> {
     final hasWin = winningGames.isNotEmpty;
 
     final drawDate = widget.qrData.drawDate;
-    final dateStr = DateFormat('yyyy년 M월 d일 (E)', 'ko_KR').format(drawDate);
+    const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+    final weekdayStr = (drawDate.weekday >= 1 && drawDate.weekday <= 7)
+        ? weekdays[drawDate.weekday - 1]
+        : '';
+    final dateStr = '${drawDate.year}년 ${drawDate.month}월 ${drawDate.day}일 ($weekdayStr)';
     final isPending = !widget.qrData.isDrawnTimePassed && !isDrawn;
 
     return Container(

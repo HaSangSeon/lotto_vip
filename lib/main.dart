@@ -8,6 +8,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:intl/date_symbol_data_local.dart';
+
 import 'theme/app_theme.dart';
 import 'services/history_service.dart';
 import 'services/notification_service.dart';
@@ -36,6 +38,7 @@ void main() async {
   };
 
   try {
+    await initializeDateFormatting('ko_KR', null);
     await AppTheme.init();
     await NotificationService.init();
     MobileAds.instance.initialize();
@@ -952,37 +955,45 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               );
               _loadHistory();
             },
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(17),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              height: 34,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
                 color: AppColors.isLight
-                    ? const Color(0xFFE8F8F5)
-                    : const Color(0xFF2ECC71).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
+                    ? const Color(0xFFFFF6DF)
+                    : AppColors.gold.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(17),
                 border: Border.all(
-                  color: const Color(0xFF2ECC71).withValues(alpha: 0.6),
+                  color: AppColors.isLight
+                      ? AppColors.lightGoldBorder.withValues(alpha: 0.7)
+                      : AppColors.borderGold.withValues(alpha: 0.4),
                   width: 1.2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF2ECC71).withValues(alpha: 0.18),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
+                    color: (AppColors.isLight ? AppColors.goldDark : AppColors.gold)
+                        .withValues(alpha: 0.08),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1.5),
                   ),
                 ],
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.qr_code_scanner_rounded, size: 15, color: Color(0xFF2ECC71)),
-                  const SizedBox(width: 3),
+                  Icon(
+                    Icons.qr_code_scanner_rounded,
+                    size: 16,
+                    color: AppColors.isLight ? AppColors.goldDeep : AppColors.gold,
+                  ),
+                  const SizedBox(width: 4),
                   Text(
                     'QR스캔',
                     style: GoogleFonts.notoSansKr(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.isLight ? const Color(0xFF145A32) : const Color(0xFFA9DFBF),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.isLight ? AppColors.goldDeep : AppColors.gold,
                     ),
                   ),
                 ],

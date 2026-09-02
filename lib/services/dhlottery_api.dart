@@ -207,4 +207,113 @@ class DHLotteryApi {
     } catch (_) {}
     return null;
   }
+
+  static final Map<int, List<DHLotteryWinningStore>> _storeMemoryCache = {};
+
+  /// 특정 회차의 1등 당첨 판매점 목록 조회 API (메모리 & 영구 로컬 캐시 적용)
+  static Future<List<DHLotteryWinningStore>> fetchWinningStores(int drwNo, {int rank = 1}) async {
+    // 1. 메모리 캐시 확인 (즉시 반환)
+    if (_storeMemoryCache.containsKey(drwNo) && _storeMemoryCache[drwNo]!.isNotEmpty) {
+      return _storeMemoryCache[drwNo]!;
+    }
+
+    // 2. 로컬 디스크 캐시(SharedPreferences) 확인 (오프라인/서버 점검 시에도 즉시 로딩)
+    final cacheKey = 'winning_stores_${drwNo}_$rank';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedRaw = prefs.getString(cacheKey);
+      if (cachedRaw != null && cachedRaw.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(cachedRaw);
+        final cachedList = decoded
+            .map((e) => DHLotteryWinningStore.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+        if (cachedList.isNotEmpty) {
+          _storeMemoryCache[drwNo] = cachedList;
+          return cachedList;
+        }
+      }
+    } catch (_) {}
+
+    // 3. 동행복권 공식 REST API 네트워크 통신
+    try {
+      final url = Uri.parse(
+        'https://www.dhlottery.co.kr/wnprchsplcsrch/selectLtWnShp.do?srchWnShpRnk=$rank&srchLtEpsd=$drwNo',
+      );
+      final response = await http.get(url, headers: {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+        'Accept': 'application/json',
+      }).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+        final list = decoded['data']?['list'];
+        if (list is List && list.isNotEmpty) {
+          final resultList = list
+              .map((item) => DHLotteryWinningStore.fromJson(Map<String, dynamic>.from(item)))
+              .toList();
+
+          _storeMemoryCache[drwNo] = resultList;
+
+          // 과거 회차는 데이터가 영구적이므로 기기에 영구 캐싱 저장
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            final rawJson = jsonEncode(resultList.map((e) => e.toJson()).toList());
+            await prefs.setString(cacheKey, rawJson);
+          } catch (_) {}
+
+          return resultList;
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+}
+
+class DHLotteryWinningStore {
+  final int rank; // 1 (1등)
+  final String name; // shpNm (상호명)
+  final String address; // shpAddr (상세주소)
+  final String region; // region (지역: 서울, 경기 등)
+  final String winType; // atmtPsvYnTxt (자동, 수동, 반자동)
+  final String? phone; // shpTelno (전화번호)
+  final double? lat; // shpLat
+  final double? lng; // shpLot
+
+  DHLotteryWinningStore({
+    required this.rank,
+    required this.name,
+    required this.address,
+    required this.region,
+    required this.winType,
+    this.phone,
+    this.lat,
+    this.lng,
+  });
+
+  factory DHLotteryWinningStore.fromJson(Map<String, dynamic> json) {
+    final rawAddr = (json['shpAddr'] ?? '').toString();
+    final cleanAddr = rawAddr.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    return DHLotteryWinningStore(
+      rank: json['wnShpRnk'] is int ? json['wnShpRnk'] : 1,
+      name: (json['shpNm'] ?? '복권판매점').toString().trim(),
+      address: cleanAddr.isNotEmpty ? cleanAddr : '주소 정보 없음',
+      region: (json['region'] ?? '').toString().trim(),
+      winType: (json['atmtPsvYnTxt'] ?? '자동').toString().trim(),
+      phone: json['shpTelno']?.toString(),
+      lat: (json['shpLat'] is num) ? (json['shpLat'] as num).toDouble() : null,
+      lng: (json['shpLot'] is num) ? (json['shpLot'] as num).toDouble() : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'wnShpRnk': rank,
+        'shpNm': name,
+        'shpAddr': address,
+        'region': region,
+        'atmtPsvYnTxt': winType,
+        'shpTelno': phone,
+        'shpLat': lat,
+        'shpLot': lng,
+      };
 }
