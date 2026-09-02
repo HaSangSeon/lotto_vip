@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
+import 'history_service.dart';
+
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -23,6 +25,14 @@ class NotificationService {
   static final ValueNotifier<String?> onNotificationPayload = ValueNotifier(null);
 
   static bool get isEnabled => _isEnabled;
+
+  /// 현재 시점 기준 다음 추첨 회차 번호 계산 (다음 토요일 20:45 기준)
+  static int getUpcomingDrawNo() {
+    final firstDrawDate = DateTime(2002, 12, 7, 20, 45, 0);
+    final nextSaturday = _nextInstanceOfSaturday845PM();
+    final diff = nextSaturday.difference(firstDrawDate);
+    return (diff.inDays / 7).round() + 1;
+  }
 
   /// 알림 서비스 초기화 (main()에서 호출)
   static Future<void> init() async {
@@ -120,10 +130,31 @@ class NotificationService {
     }
   }
 
-  /// 매주 토요일 저녁 8시 45분 알림 스케줄링
+  /// 매주 토요일 저녁 8시 45분 알림 스케줄링 (보관함 등록 복권 여부에 따라 맞춤 문구 적용)
   static Future<void> scheduleWeeklyDrawNotification() async {
     try {
       final scheduledDate = _nextInstanceOfSaturday845PM();
+
+      // 보관함에서 이번 회차 또는 미추첨 등록 번호(실물 복권 및 생성 번호 모두 포함) 확인
+      final upcomingDrawNo = getUpcomingDrawNo();
+      final history = await HistoryService.load();
+      final registeredTickets = history.where((e) => e.drawNo >= upcomingDrawNo).toList();
+
+      final String title;
+      final String body;
+      final String payload;
+
+      if (registeredTickets.isNotEmpty) {
+        final ticket = registeredTickets.first;
+        final totalGames = registeredTickets.fold(0, (sum, t) => sum + t.gameCount);
+        title = '🎫 [제${ticket.drawNo}회] 보관함 번호 추첨 완료!';
+        body = '등록해두신 번호($totalGames게임)의 추첨이 끝났습니다. 지금 당첨 결과를 확인해보세요! 🎰';
+        payload = 'lotto_draw_result:${ticket.drawNo}';
+      } else {
+        title = '💰 혹시… 이번 주 1등 당첨자이신가요?';
+        body = '로또 추첨이 완료되었습니다. 저장해둔 내 번호와 지금 맞춰보세요! 🎰';
+        payload = 'lotto_draw_result';
+      }
 
       const AndroidNotificationDetails androidDetails =
           AndroidNotificationDetails(
@@ -147,20 +178,21 @@ class NotificationService {
         iOS: iosDetails,
       );
 
+      await _notificationsPlugin.cancel(_weeklyNotificationId);
       await _notificationsPlugin.zonedSchedule(
         _weeklyNotificationId,
-        '💰 혹시… 이번 주 1등 당첨자이신가요?',
-        '로또 추첨이 완료되었습니다. 저장해둔 내 번호와 지금 맞춰보세요! 🎰',
+        title,
+        body,
         scheduledDate,
         platformDetails,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-        payload: 'lotto_draw_result',
+        payload: payload,
       );
 
-      debugPrint('Weekly notification scheduled for: $scheduledDate');
+      debugPrint('Weekly notification scheduled for: $scheduledDate (Custom ticket: ${registeredTickets.isNotEmpty})');
     } catch (e) {
       debugPrint('Failed to schedule weekly notification: $e');
     }
@@ -180,6 +212,26 @@ class NotificationService {
   static Future<void> showTestNotification() async {
     try {
       await requestPermission();
+
+      final upcomingDrawNo = getUpcomingDrawNo();
+      final history = await HistoryService.load();
+      final registeredTickets = history.where((e) => e.drawNo >= upcomingDrawNo).toList();
+
+      final String title;
+      final String body;
+      final String payload;
+
+      if (registeredTickets.isNotEmpty) {
+        final ticket = registeredTickets.first;
+        final totalGames = registeredTickets.fold(0, (sum, t) => sum + t.gameCount);
+        title = '🎫 [테스트] [제${ticket.drawNo}회] 보관함 번호 추첨 완료!';
+        body = '등록해두신 번호($totalGames게임)의 추첨이 끝났습니다. 지금 당첨 결과를 확인해보세요! 🎰';
+        payload = 'test_notification:${ticket.drawNo}';
+      } else {
+        title = '💰 [테스트] 혹시… 이번 주 1등 당첨자이신가요?';
+        body = '로또 추첨이 완료되었습니다. 저장해둔 내 번호와 지금 맞춰보세요! 🎰';
+        payload = 'test_notification';
+      }
 
       const AndroidNotificationDetails androidDetails =
           AndroidNotificationDetails(
@@ -205,10 +257,10 @@ class NotificationService {
 
       await _notificationsPlugin.show(
         _testNotificationId,
-        '💰 [테스트] 혹시… 이번 주 1등 당첨자이신가요?',
-        '로또 추첨이 완료되었습니다. 저장해둔 내 번호와 지금 맞춰보세요! 🎰',
+        title,
+        body,
         platformDetails,
-        payload: 'test_notification',
+        payload: payload,
       );
     } catch (e) {
       debugPrint('Failed to show test notification: $e');

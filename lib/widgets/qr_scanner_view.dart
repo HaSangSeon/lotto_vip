@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../services/qr_lottery_parser.dart';
 import '../services/dhlottery_api.dart';
 import '../services/history_service.dart';
+import '../services/notification_service.dart';
 import 'qr_result_sheet.dart';
 
 class QrScannerView extends StatefulWidget {
@@ -78,24 +79,31 @@ class _QrScannerViewState extends State<QrScannerView> {
           }
         }
 
-        // 3. 보관함(히스토리)에 스캔한 번호 안전하게 자동 저장
+        // 3. 보관함(히스토리)에 스캔한 실물 복권 묶음(영수증)으로 자동 저장
         final existingHistory = await HistoryService.load();
-        for (final game in qrData.games) {
-          final alreadySaved = existingHistory.any((e) =>
-              e.numbers.length == game.numbers.length &&
-              e.numbers.every((n) => game.numbers.contains(n)) &&
-              e.title.contains('${qrData.drwNo}회') &&
-              e.title.contains(game.label));
-
-          if (!alreadySaved) {
-            await HistoryService.save(
-              LottoHistoryEntry(
-                title: '[QR스캔] 제${qrData.drwNo}회 ${game.label}게임',
-                numbers: game.numbers,
-                createdAt: DateTime.now(),
-              ),
-            );
+        final firstGame = qrData.games.first;
+        final alreadySaved = existingHistory.any((e) {
+          if (e.drawNo != qrData.drwNo) return false;
+          if (e.isTicket && e.games != null) {
+            return e.games!.length == qrData.games.length &&
+                e.games!.first.numbers.every((n) => firstGame.numbers.contains(n));
           }
+          return e.numbers.length == firstGame.numbers.length &&
+              e.numbers.every((n) => firstGame.numbers.contains(n));
+        });
+
+        if (!alreadySaved) {
+          final ticketEntry = LottoHistoryEntry(
+            title: '[QR스캔] 제${qrData.drwNo}회 실물 복권 (${qrData.games.length}게임)',
+            numbers: firstGame.numbers,
+            games: qrData.games
+                .map((g) => SavedLotteryGame(label: g.label, numbers: g.numbers))
+                .toList(),
+            createdAt: DateTime.now(),
+          );
+          await HistoryService.save(ticketEntry);
+          // 토요일 맞춤 알림 스케줄 즉시 갱신
+          await NotificationService.scheduleWeeklyDrawNotification();
         }
 
         widget.onHistorySaved?.call();

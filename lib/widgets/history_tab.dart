@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:intl/intl.dart';
 
 import '../theme/app_theme.dart';
 import '../services/history_service.dart';
@@ -34,6 +35,22 @@ class LottoRankInfo {
   });
 }
 
+class TicketEvaluationSummary {
+  final int bestRank; // 1~5, 0 (낙첨), -1 (추첨 대기)
+  final String summaryLabel;
+  final Color badgeColor;
+  final int totalPrize;
+  final Map<int, int> winCounts;
+
+  const TicketEvaluationSummary({
+    required this.bestRank,
+    required this.summaryLabel,
+    required this.badgeColor,
+    required this.totalPrize,
+    required this.winCounts,
+  });
+}
+
 class HistoryTab extends StatefulWidget {
   final List<LottoHistoryEntry> history;
   final VoidCallback onClear;
@@ -56,12 +73,26 @@ class _HistoryTabState extends State<HistoryTab> {
   HistoryFilter _selectedFilter = HistoryFilter.all;
   bool _onlyFavorites = false; // 즐겨찾기 필터
 
-  DHLotteryResult? _currentCompareResult; // 현재 대조 중인 회차 결과
   int? _latestDrawNo;
-  bool _isLoadingDraw = true;
 
-  // 회차별 당첨 결과 캐시 (스캔 복권 각각의 회차 및 선택 대조용)
+  // 회차별 당첨 결과 캐시 (스캔 복권 및 과거 회차 당첨 결과)
   final Map<int, DHLotteryResult> _drawResultsCache = {};
+
+  // 접힌 티켓 키 집합
+  final Set<String> _collapsedTicketKeys = {};
+
+  int get _upcomingDrawNo => HistoryService.calculateTargetDrawNo(DateTime.now());
+
+  DateTime get _upcomingDrawDate {
+    final firstDraw = DateTime(2002, 12, 7, 20, 45, 0);
+    return firstDraw.add(Duration(days: (_upcomingDrawNo - 1) * 7));
+  }
+
+  int get _waitingGameCount {
+    return widget.history
+        .where((e) => e.drawNo == _upcomingDrawNo)
+        .fold(0, (sum, e) => sum + e.gameCount);
+  }
 
   @override
   void initState() {
@@ -74,310 +105,38 @@ class _HistoryTabState extends State<HistoryTab> {
       final res = await DHLotteryApi.fetchLatest();
       if (mounted && res != null) {
         setState(() {
-          _currentCompareResult = res;
           _latestDrawNo = res.drwNo;
           _drawResultsCache[res.drwNo] = res;
-          _isLoadingDraw = false;
         });
 
-        // 스캔된 복권 중 다른 회차가 있으면 백그라운드에서 로드
-        _preloadScannedDraws();
-      } else {
-        if (mounted) setState(() => _isLoadingDraw = false);
+        // 과거 회차 결과들을 백그라운드에서 로드
+        _preloadDrawResults();
       }
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingDraw = false);
-    }
+    } catch (_) {}
   }
 
-  Future<void> _preloadScannedDraws() async {
+  Future<void> _preloadDrawResults() async {
     for (final entry in widget.history) {
-      if (entry.entryType == LottoEntryType.qrScan) {
-        final drawNo = entry.drawNo;
-        if (!_drawResultsCache.containsKey(drawNo)) {
-          final res = await DHLotteryApi.fetchByDrawNo(drawNo);
-          if (res != null && mounted) {
-            setState(() {
-              _drawResultsCache[drawNo] = res;
-            });
-          }
+      final drawNo = entry.drawNo;
+      if (_latestDrawNo != null && drawNo <= _latestDrawNo! && !_drawResultsCache.containsKey(drawNo)) {
+        final res = await DHLotteryApi.fetchByDrawNo(drawNo);
+        if (res != null && mounted) {
+          setState(() {
+            _drawResultsCache[drawNo] = res;
+          });
         }
       }
     }
   }
 
-  /// 대조 기준 회차 변경
-  Future<void> _changeCompareDrawNo(int drwNo) async {
-    if (_drawResultsCache.containsKey(drwNo)) {
-      setState(() {
-        _currentCompareResult = _drawResultsCache[drwNo];
-      });
-      return;
-    }
 
-    setState(() => _isLoadingDraw = true);
-    final res = await DHLotteryApi.fetchByDrawNo(drwNo);
-    if (mounted) {
-      setState(() {
-        if (res != null) {
-          _drawResultsCache[drwNo] = res;
-          _currentCompareResult = res;
-        }
-        _isLoadingDraw = false;
-      });
-    }
-  }
-
-  /// 🌟 프리미엄 회차 선택 다이얼로그 (고급스러운 디자인 & 정렬)
-  void _showDrawSelectDialog() {
-    if (_latestDrawNo == null) return;
-    final controller = TextEditingController(
-      text: _currentCompareResult?.drwNo.toString() ?? _latestDrawNo.toString(),
-    );
-    final isLight = AppColors.isLight;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: isLight ? AppColors.lightGoldBorder : AppColors.borderGold,
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: (isLight ? AppColors.goldDark : Colors.black).withValues(alpha: 0.25),
-                blurRadius: 28,
-                spreadRadius: 4,
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // 1. 헤더: 아이콘 + 제목 + 닫기
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: isLight
-                              ? const Color(0xFFFFF0C2)
-                              : AppColors.gold.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Icons.manage_search_rounded,
-                          color: isLight ? AppColors.goldDeep : AppColors.gold,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        '대조할 회차 선택',
-                        style: GoogleFonts.notoSansKr(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                          fontSize: 18,
-                        ),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.close_rounded, color: AppColors.textHint, size: 20),
-                    onPressed: () => Navigator.pop(ctx),
-                    visualDensity: VisualDensity.compact,
-                    splashRadius: 18,
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 14),
-
-              // 2. 설명 텍스트
-              Text(
-                '보관된 번호들을 비교할 회차를 입력하세요.\n(1회차 ~ 최신 제$_latestDrawNo회)',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                  height: 1.45,
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              // 3. 회차 입력 필드 (가운데 정렬 & 고급스러운 스타일)
-              TextField(
-                controller: controller,
-                keyboardType: TextInputType.number,
-                autofocus: true,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.rajdhani(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                  color: isLight ? AppColors.goldDeep : AppColors.goldLight,
-                ),
-                decoration: InputDecoration(
-                  hintText: '$_latestDrawNo',
-                  hintStyle: GoogleFonts.rajdhani(color: AppColors.textHint),
-                  suffixText: '회',
-                  suffixStyle: GoogleFonts.notoSansKr(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                  filled: true,
-                  fillColor: isLight ? const Color(0xFFF9F9F9) : Colors.white.withValues(alpha: 0.05),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: AppColors.borderSubtle),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(
-                      color: isLight ? AppColors.lightGoldBorder.withValues(alpha: 0.5) : AppColors.borderGold.withValues(alpha: 0.4),
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(
-                      color: isLight ? AppColors.goldDark : AppColors.gold,
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 14),
-
-              // 4. 빠른 선택 칩 버튼들
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  InkWell(
-                    onTap: () => controller.text = _latestDrawNo.toString(),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isLight ? const Color(0xFFFFF0C2) : AppColors.gold.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isLight ? const Color(0xFFD4AF37) : AppColors.gold.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      child: Text(
-                        '최신 제$_latestDrawNo회',
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 11.5,
-                          color: AppColors.goldText,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (_latestDrawNo! > 1) ...[
-                    const SizedBox(width: 8),
-                    InkWell(
-                      onTap: () => controller.text = (_latestDrawNo! - 1).toString(),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isLight ? Colors.grey.shade200 : Colors.white.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.borderSubtle),
-                        ),
-                        child: Text(
-                          '이전 제${_latestDrawNo! - 1}회',
-                          style: GoogleFonts.notoSansKr(
-                            fontSize: 11.5,
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              // 5. 하단 액션 버튼 (취소 | 대조하기 50:50 정렬)
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 48),
-                        foregroundColor: AppColors.textSecondary,
-                        side: BorderSide(color: AppColors.borderSubtle),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      child: Text(
-                        '취소',
-                        style: GoogleFonts.notoSansKr(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        final val = int.tryParse(controller.text.trim());
-                        if (val != null && val >= 1 && val <= _latestDrawNo!) {
-                          Navigator.pop(ctx);
-                          _changeCompareDrawNo(val);
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(0, 48),
-                        backgroundColor: isLight ? AppColors.goldDark : AppColors.gold,
-                        foregroundColor: isLight ? Colors.white : Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        elevation: isLight ? 2 : 4,
-                      ),
-                      child: Text(
-                        '대조하기',
-                        style: GoogleFonts.notoSansKr(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   /// 당첨 등수 판정
   LottoRankInfo _judgeRank(List<int> myNumbers, DHLotteryResult? result) {
     if (result == null) {
       return const LottoRankInfo(
-        rank: 0,
-        label: '조회 대기',
+        rank: -1,
+        label: '추첨 대기',
         prizeText: '',
         badgeColor: Colors.grey,
         matchedNumbers: {},
@@ -446,15 +205,14 @@ class _HistoryTabState extends State<HistoryTab> {
     }
   }
 
-  /// 엔트리에 맞는 대조용 당첨 결과 가져오기
+  /// 엔트리에 맞는 고유 대상 회차의 당첨 결과 가져오기
   DHLotteryResult? _getResultForEntry(LottoHistoryEntry entry) {
-    if (entry.entryType == LottoEntryType.qrScan) {
-      // 실물 복권은 용지 자체의 회차 기준
-      return _drawResultsCache[entry.drawNo] ?? _currentCompareResult;
-    } else {
-      // 생성 번호(VIP/맞춤)는 사용자가 선택한 대조 회차 기준
-      return _currentCompareResult;
+    final entryDrawNo = entry.drawNo;
+    // 최신 발표 회차보다 미래의 회차(예: 이번 주 토요일 추첨 예정)는 아직 추첨 전이므로 null -> [추첨 대기]
+    if (_latestDrawNo != null && entryDrawNo > _latestDrawNo!) {
+      return null;
     }
+    return _drawResultsCache[entryDrawNo];
   }
 
   void _confirmDeleteEntry(LottoHistoryEntry entry) {
@@ -528,6 +286,12 @@ class _HistoryTabState extends State<HistoryTab> {
           return entry.entryType == LottoEntryType.vipLucky || entry.entryType == LottoEntryType.custom;
         case HistoryFilter.winnersOnly:
           final compareResult = _getResultForEntry(entry);
+          if (entry.isTicket && entry.games != null) {
+            return entry.games!.any((g) {
+              final r = _judgeRank(g.numbers, compareResult);
+              return r.rank >= 1 && r.rank <= 5;
+            });
+          }
           final rankInfo = _judgeRank(entry.numbers, compareResult);
           return rankInfo.rank >= 1 && rankInfo.rank <= 5;
       }
@@ -535,8 +299,8 @@ class _HistoryTabState extends State<HistoryTab> {
 
     return Column(
       children: [
-        // 1. 상단 최신/대조 당첨 번호 카드 & 회차 선택 버튼
-        _buildCompareDrawHeader(),
+        // 1. 상단 이번 주 추첨 예정 안내 & 종이복권 QR 스캔 버튼
+        _buildUpcomingDrawHeader(),
 
         // 2. 상단 제어 바 (보관된 번호 N개 / 즐겨찾기 / 전체삭제) + 4개 세그먼트 필터 바
         _buildSimpleSegmentBar(displayedHistory.length),
@@ -551,10 +315,14 @@ class _HistoryTabState extends State<HistoryTab> {
                   separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final entry = displayedHistory[index];
-                    final isScanned = entry.entryType == LottoEntryType.qrScan;
-
-                    // 대조용 결과 및 랭크 계산
                     final targetResult = _getResultForEntry(entry);
+
+                    // 묶음 실물 복권(영수증)인 경우 전용 카드 렌더링
+                    if (entry.isTicket) {
+                      return _buildTicketCard(entry, targetResult, index);
+                    }
+
+                    final isScanned = entry.entryType == LottoEntryType.qrScan;
                     final rankInfo = _judgeRank(entry.numbers, targetResult);
 
                     final timeStr =
@@ -605,62 +373,22 @@ class _HistoryTabState extends State<HistoryTab> {
                                 _buildTypeBadge(entry.entryType),
                                 const SizedBox(width: 6),
 
-                                // 회차 정보
-                                if (isScanned) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.isLight ? Colors.black.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      '${entry.drawNo}회차${gameLabel.isNotEmpty ? " • $gameLabel" : ""}',
-                                      style: GoogleFonts.notoSansKr(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  ),
-                                ] else ...[
-                                  // 생성 번호는 회차 변경 뱃지 역할!
-                                  InkWell(
-                                    onTap: _showDrawSelectDialog,
+                                // 회차 정보 (해당 번호의 고유 추첨 회차)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.isLight ? Colors.black.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(6),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.isLight
-                                            ? const Color(0xFFFFF0C2)
-                                            : AppColors.gold.withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                          color: AppColors.isLight ? const Color(0xFFD4AF37) : AppColors.gold.withValues(alpha: 0.4),
-                                          width: 0.8,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            '${_currentCompareResult?.drwNo ?? _latestDrawNo ?? ""}회 대조',
-                                            style: GoogleFonts.notoSansKr(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
-                                              color: AppColors.isLight ? const Color(0xFF855A00) : AppColors.gold,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 2),
-                                          Icon(
-                                            Icons.arrow_drop_down,
-                                            size: 14,
-                                            color: AppColors.isLight ? const Color(0xFF855A00) : AppColors.gold,
-                                          ),
-                                        ],
-                                      ),
+                                  ),
+                                  child: Text(
+                                    '${entry.drawNo}회차${gameLabel.isNotEmpty ? " • $gameLabel" : ""}',
+                                    style: GoogleFonts.notoSansKr(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
-                                ],
+                                ),
 
                                 // 불필요한 줄임표 텍스트 대신 Spacer로 여백 확보
                                 const Spacer(),
@@ -818,144 +546,543 @@ class _HistoryTabState extends State<HistoryTab> {
     );
   }
 
-  /// 상단 대조 당첨 번호 헤더 카드 (회차 변경 탭 지원)
-  Widget _buildCompareDrawHeader() {
-    final drwNo = _currentCompareResult?.drwNo ?? _latestDrawNo ?? 0;
-    final isLatest = _latestDrawNo != null && drwNo == _latestDrawNo;
+  /// 묶음 실물 복권 종합 판정
+  TicketEvaluationSummary _judgeTicket(LottoHistoryEntry entry, DHLotteryResult? result) {
+    if (result == null) {
+      return const TicketEvaluationSummary(
+        bestRank: -1,
+        summaryLabel: '추첨 대기',
+        badgeColor: Colors.grey,
+        totalPrize: 0,
+        winCounts: {},
+      );
+    }
+
+    final games = entry.games ?? [];
+    final Map<int, int> winCounts = {};
+    int bestRank = 999;
+    int totalPrize = 0;
+
+    for (final g in games) {
+      final rankInfo = _judgeRank(g.numbers, result);
+      if (rankInfo.rank >= 1 && rankInfo.rank <= 5) {
+        winCounts[rankInfo.rank] = (winCounts[rankInfo.rank] ?? 0) + 1;
+        if (rankInfo.rank < bestRank) {
+          bestRank = rankInfo.rank;
+        }
+        if (rankInfo.rank == 5) {
+          totalPrize += 5000;
+        } else if (rankInfo.rank == 4) {
+          totalPrize += 50000;
+        } else if (rankInfo.rank == 3) {
+          totalPrize += result.rank3Amount > 0 ? result.rank3Amount : 1500000;
+        } else if (rankInfo.rank == 2) {
+          totalPrize += result.rank2Amount > 0 ? result.rank2Amount : 50000000;
+        } else if (rankInfo.rank == 1) {
+          totalPrize += result.firstWinamnt > 0 ? result.firstWinamnt : 2000000000;
+        }
+      }
+    }
+
+    if (winCounts.isEmpty) {
+      return const TicketEvaluationSummary(
+        bestRank: 0,
+        summaryLabel: '낙첨',
+        badgeColor: Colors.white24,
+        totalPrize: 0,
+        winCounts: {},
+      );
+    }
+
+    String label = '';
+    if (winCounts.containsKey(1)) {
+      label = '🎉 1등 당첨!';
+    } else if (winCounts.containsKey(2)) {
+      label = '🎉 2등 당첨!';
+    } else if (winCounts.containsKey(3)) {
+      label = '🎉 3등 당첨!';
+    } else if (winCounts.containsKey(4) && winCounts.containsKey(5)) {
+      label = '🎉 4등 ${winCounts[4]}개 · 5등 ${winCounts[5]}개';
+    } else if (winCounts.containsKey(4)) {
+      label = '🎉 4등 ${winCounts[4]}개 당첨';
+    } else if (winCounts.containsKey(5)) {
+      final count = winCounts[5]!;
+      label = count > 1 ? '🎉 5등 $count개 (${NumberFormat('#,###').format(count * 5000)}원)' : '🎉 5등 (5,000원)';
+    }
+
+    Color badgeColor;
+    switch (bestRank) {
+      case 1: badgeColor = const Color(0xFFFFD700); break;
+      case 2: badgeColor = const Color(0xFF5DADE2); break;
+      case 3: badgeColor = const Color(0xFFE59866); break;
+      case 4: badgeColor = const Color(0xFF2ECC71); break;
+      case 5: badgeColor = const Color(0xFFF39C12); break;
+      default: badgeColor = Colors.white24;
+    }
+
+    return TicketEvaluationSummary(
+      bestRank: bestRank,
+      summaryLabel: label,
+      badgeColor: badgeColor,
+      totalPrize: totalPrize,
+      winCounts: winCounts,
+    );
+  }
+
+  /// 묶음 실물 복권 영수증 카드 렌더링
+  Widget _buildTicketCard(LottoHistoryEntry entry, DHLotteryResult? targetResult, int index) {
+    final ticketKey = '${entry.createdAt.toIso8601String()}_${entry.title}_$index';
+    final isCollapsed = _collapsedTicketKeys.contains(ticketKey);
+    final summary = _judgeTicket(entry, targetResult);
+    final isLight = AppColors.isLight;
+    final games = entry.games ?? [];
+
+    final timeStr =
+        '${entry.createdAt.month}/${entry.createdAt.day} ${entry.createdAt.hour.toString().padLeft(2, '0')}:${entry.createdAt.minute.toString().padLeft(2, '0')}';
+
+    return Dismissible(
+      key: ValueKey(ticketKey),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: Colors.redAccent.withValues(alpha: 0.8),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.delete_outline_rounded, color: Colors.white, size: 24),
+            SizedBox(width: 6),
+            Text('삭제', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+          ],
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        _confirmDeleteEntry(entry);
+        return false;
+      },
+      child: GlassCard(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+        borderRadius: 20,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. 헤더 행: [🎫 실물 복권] [제1158회 • 5게임] ... [🎉 당첨 요약 뱃지] [❤️] [🗑️]
+            Row(
+              children: [
+                _buildTypeBadge(LottoEntryType.qrScan),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isLight ? Colors.black.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '${entry.drawNo}회차 • ${entry.gameCount}게임',
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                _buildTicketSummaryBadge(summary),
+                const SizedBox(width: 6),
+                // 즐겨찾기
+                GestureDetector(
+                  onTap: () async {
+                    setState(() {
+                      entry.isFavorite = !entry.isFavorite;
+                    });
+                    await HistoryService.updateAll(widget.history);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      entry.isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: entry.isFavorite ? Colors.redAccent : AppColors.textHint,
+                      size: 18,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 2),
+                // 삭제
+                GestureDetector(
+                  onTap: () => _confirmDeleteEntry(entry),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.delete_outline_rounded,
+                      color: AppColors.textHint,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // 2. 영수증 본문 (게임 목록)
+            if (isCollapsed) ...[
+              // 접힌 상태: 첫 번째 대표 게임 1줄
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    _collapsedTicketKeys.remove(ticketKey);
+                  });
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 22,
+                        height: 22,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isLight ? Colors.grey.shade300 : Colors.white12,
+                        ),
+                        child: Text(
+                          games.isNotEmpty ? games.first.label : 'A',
+                          style: GoogleFonts.rajdhani(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: LottoBallRow(
+                          numbers: games.isNotEmpty ? games.first.numbers : entry.numbers,
+                          ballSize: 30,
+                          matchedNumbers: targetResult != null
+                              ? _judgeRank(games.isNotEmpty ? games.first.numbers : entry.numbers, targetResult).matchedNumbers
+                              : null,
+                          bonusNumber: targetResult?.bonusNo,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ] else ...[
+              // 펼쳐진 상태: A, B, C, D, E 게임 라인별 출력
+              ...games.map((game) {
+                final gameRank = targetResult != null ? _judgeRank(game.numbers, targetResult) : null;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      // 라벨 배지 (A, B, C, D, E)
+                      Container(
+                        width: 22,
+                        height: 22,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isLight ? const Color(0xFFFFF0C2) : AppColors.gold.withValues(alpha: 0.18),
+                          border: Border.all(
+                            color: isLight ? const Color(0xFFD4AF37) : AppColors.gold.withValues(alpha: 0.4),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Text(
+                          game.label,
+                          style: GoogleFonts.rajdhani(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: AppColors.goldText,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // 6개 로또 볼
+                      Expanded(
+                        child: LottoBallRow(
+                          numbers: game.numbers,
+                          ballSize: 30,
+                          matchedNumbers: gameRank?.matchedNumbers,
+                          bonusNumber: targetResult?.bonusNo,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // 개별 게임 결과 뱃지 (예: 5등 / 낙첨 / 3개)
+                      if (gameRank != null)
+                        _buildMiniRankBadge(gameRank),
+                    ],
+                  ),
+                );
+              }),
+            ],
+
+            const SizedBox(height: 10),
+
+            // 3. 하단 접기/펼치기 토글 바 & 생성 일시
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      if (isCollapsed) {
+                        _collapsedTicketKeys.remove(ticketKey);
+                      } else {
+                        _collapsedTicketKeys.add(ticketKey);
+                      }
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          isCollapsed
+                              ? '전체 ${entry.gameCount}게임 보기 (${entry.gameCount - 1}개 더보기)'
+                              : '영수증 접기',
+                          style: GoogleFonts.notoSansKr(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.goldText,
+                          ),
+                        ),
+                        Icon(
+                          isCollapsed ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded,
+                          size: 16,
+                          color: AppColors.goldText,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Text(
+                  timeStr,
+                  style: GoogleFonts.notoSansKr(
+                    color: AppColors.textHint,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    )
+        .animate(delay: Duration(milliseconds: index * 35))
+        .fadeIn(duration: 220.ms)
+        .slideX(begin: 0.04, end: 0, duration: 220.ms);
+  }
+
+  /// 미니 게임별 당첨 뱃지
+  Widget _buildMiniRankBadge(LottoRankInfo info) {
+    final isLight = AppColors.isLight;
+    final isWin = info.rank >= 1 && info.rank <= 5;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isWin
+            ? (isLight ? const Color(0xFFFFF3CD) : info.badgeColor.withValues(alpha: 0.2))
+            : (isLight ? Colors.black.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.05)),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isWin ? info.badgeColor : Colors.transparent,
+          width: 0.8,
+        ),
+      ),
+      child: Text(
+        info.rank >= 1 && info.rank <= 5
+            ? '${info.rank}등'
+            : (info.matchedNumbers.isNotEmpty ? '${info.matchedNumbers.length}개' : '낙첨'),
+        style: GoogleFonts.notoSansKr(
+          fontSize: 10,
+          fontWeight: isWin ? FontWeight.bold : FontWeight.w500,
+          color: isWin ? (isLight ? const Color(0xFF8C5D00) : info.badgeColor) : AppColors.textHint,
+        ),
+      ),
+    );
+  }
+
+  /// 티켓 단위 종합 당첨 요약 뱃지
+  Widget _buildTicketSummaryBadge(TicketEvaluationSummary summary) {
+    final isLight = AppColors.isLight;
+    final isWin = summary.bestRank >= 1 && summary.bestRank <= 5;
+
+    Color bg;
+    Color border;
+    Color text;
+
+    if (summary.bestRank == -1) {
+      bg = isLight ? Colors.grey.shade100 : Colors.white.withValues(alpha: 0.05);
+      border = isLight ? Colors.grey.shade300 : Colors.white12;
+      text = AppColors.textHint;
+    } else if (isWin) {
+      bg = isLight ? const Color(0xFFFFF3CD) : summary.badgeColor.withValues(alpha: 0.22);
+      border = isLight ? const Color(0xFFFFC107) : summary.badgeColor;
+      text = isLight ? const Color(0xFF8C5D00) : summary.badgeColor;
+    } else {
+      bg = isLight ? const Color(0xFFF8F9F9) : Colors.white.withValues(alpha: 0.05);
+      border = isLight ? const Color(0xFFE5E7E9) : Colors.white12;
+      text = isLight ? const Color(0xFF707B7C) : const Color(0xFF85929E);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: border, width: 0.8),
+      ),
+      child: Text(
+        summary.summaryLabel,
+        style: GoogleFonts.notoSansKr(
+          fontSize: 11,
+          fontWeight: isWin ? FontWeight.bold : FontWeight.w600,
+          color: text,
+        ),
+      ),
+    );
+  }
+
+  /// 상단 이번 주 추첨 예정 및 현황 안내 카드
+  Widget _buildUpcomingDrawHeader() {
+    final upcomingDrawNo = _upcomingDrawNo;
+    final drawDate = _upcomingDrawDate;
+    final waitingCount = _waitingGameCount;
+    final isLight = AppColors.isLight;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppColors.isLight
-              ? AppColors.lightGoldBorder.withValues(alpha: 0.4)
+          color: isLight
+              ? AppColors.lightGoldBorder.withValues(alpha: 0.6)
               : AppColors.borderGold.withValues(alpha: 0.4),
         ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              // 회차 선택 팝업 트리거 버튼
-              InkWell(
-                onTap: _showDrawSelectDialog,
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.isLight ? const Color(0xFFFFF0C2) : AppColors.gold.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppColors.isLight ? const Color(0xFFD4AF37) : AppColors.gold.withValues(alpha: 0.4),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.tune, color: AppColors.goldText, size: 14),
-                      const SizedBox(width: 4),
-                      Text(
-                        '제 $drwNo회 ${isLatest ? "(최신)" : "(선택)"}',
-                        style: GoogleFonts.notoSansKr(
-                          color: AppColors.goldText,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      Icon(Icons.arrow_drop_down, color: AppColors.goldText, size: 16),
-                    ],
-                  ),
-                ),
-              ),
-
-              const Spacer(),
-
-              // 종이복권 QR 스캔 버튼
-              InkWell(
-                onTap: () async {
-                  await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => QrScannerView(
-                        onHistorySaved: widget.onRefresh,
-                      ),
-                    ),
-                  );
-                  widget.onRefresh?.call();
-                },
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.isLight ? const Color(0xFFE8F8F5) : const Color(0xFF2ECC71).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: const Color(0xFF2ECC71).withValues(alpha: 0.4),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.qr_code_scanner, size: 13, color: Color(0xFF2ECC71)),
-                      const SizedBox(width: 4),
-                      Text(
-                        '종이복권 QR',
-                        style: GoogleFonts.notoSansKr(
-                          color: AppColors.isLight ? const Color(0xFF145A32) : const Color(0xFFA9DFBF),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+        boxShadow: [
+          BoxShadow(
+            color: isLight ? AppColors.goldDark.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
           ),
-          const SizedBox(height: 10),
-          if (_isLoadingDraw)
-            const SizedBox(
-              height: 28,
-              child: Center(
-                child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+        ],
+      ),
+      child: Row(
+        children: [
+          // 왼쪽: 이번 주 추첨 회차 안내 & 보관 현황
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: isLight ? const Color(0xFFFFF0C2) : AppColors.gold.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isLight ? const Color(0xFFD4AF37) : AppColors.gold.withValues(alpha: 0.4),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.schedule_rounded, color: AppColors.goldText, size: 13),
+                          const SizedBox(width: 4),
+                          Text(
+                            '이번 주 제 $upcomingDrawNo회 추첨',
+                            style: GoogleFonts.notoSansKr(
+                              color: AppColors.goldText,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isLight ? Colors.black.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '추첨 대기',
+                        style: GoogleFonts.notoSansKr(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${drawDate.month}월 ${drawDate.day}일 (토) 20:45 발표 • ${waitingCount > 0 ? "보관함 $waitingCount게임 대기 중" : "보관된 번호 없음"}',
+                  style: GoogleFonts.notoSansKr(
+                    color: AppColors.textHint,
+                    fontSize: 11.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
+          // 오른쪽: 종이복권 QR 스캔 버튼
+          InkWell(
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => QrScannerView(
+                    onHistorySaved: widget.onRefresh,
+                  ),
+                ),
+              );
+              widget.onRefresh?.call();
+            },
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: isLight ? const Color(0xFFE8F8F5) : const Color(0xFF2ECC71).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFF2ECC71).withValues(alpha: 0.4),
                 ),
               ),
-            )
-          else if (_currentCompareResult != null)
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  ..._currentCompareResult!.numbers.map(
-                    (n) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2.5),
-                      child: LottoBall(number: n, size: 28),
+                  const Icon(Icons.qr_code_scanner, size: 18, color: Color(0xFF2ECC71)),
+                  const SizedBox(height: 3),
+                  Text(
+                    '종이복권 QR',
+                    style: GoogleFonts.notoSansKr(
+                      color: AppColors.isLight ? const Color(0xFF145A32) : const Color(0xFFA9DFBF),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text('+',
-                        style: GoogleFonts.rajdhani(
-                            color: AppColors.textSecondary, fontSize: 16, fontWeight: FontWeight.bold)),
-                  ),
-                  LottoBall(
-                    number: _currentCompareResult!.bonusNo,
-                    size: 28,
-                    isBonus: true,
                   ),
                 ],
               ),
-            )
-          else
-            Text(
-              '추첨 결과를 불러오는 중입니다...',
-              style: GoogleFonts.notoSansKr(color: AppColors.textHint, fontSize: 12),
             ),
+          ),
         ],
       ),
     );
@@ -1166,6 +1293,11 @@ class _HistoryTabState extends State<HistoryTab> {
     Color textColor;
 
     switch (info.rank) {
+      case -1:
+        bgColor = isLight ? const Color(0xFFF4F6F6) : Colors.white.withValues(alpha: 0.06);
+        borderColor = isLight ? const Color(0xFFBDC3C7) : Colors.white24;
+        textColor = isLight ? const Color(0xFF7F8C8D) : Colors.white60;
+        break;
       case 1:
         bgColor = isLight ? const Color(0xFFFFF3CD) : const Color(0xFFFFD700).withValues(alpha: 0.22);
         borderColor = isLight ? const Color(0xFFFFC107) : const Color(0xFFFFD700);

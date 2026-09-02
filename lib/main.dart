@@ -19,6 +19,7 @@ import 'widgets/history_tab.dart';
 import 'widgets/custom_settings_sheet.dart';
 import 'widgets/result_sheet.dart';
 import 'widgets/notification_settings_dialog.dart';
+import 'widgets/qr_scanner_view.dart';
 
 import 'dart:ui' as ui;
 
@@ -126,6 +127,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       setState(() {
         _selectedTab = 3; // 보관함(히스토리) 탭으로 이동
       });
+      _loadHistory();
+
+      if (payload.contains(':')) {
+        final drwStr = payload.split(':').last;
+        final drwNo = int.tryParse(drwStr);
+        if (drwNo != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showToast('📢 제$drwNo회 등록 복권의 당첨 결과를 확인하세요!');
+          });
+        }
+      }
+
       NotificationService.onNotificationPayload.value = null; // 초기화
     }
   }
@@ -235,10 +248,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _loadBannerAd() async {
     try {
-      if (!mounted) return;
+      if (!mounted) {
+        _isBannerAdLoading = false;
+        return;
+      }
       final screenWidth = MediaQuery.of(context).size.width.truncate();
-      if (screenWidth <= 0) return;
+      if (screenWidth <= 0) {
+        _isBannerAdLoading = false;
+        return;
+      }
+      // ignore: deprecated_member_use
       final AnchoredAdaptiveBannerAdSize? size =
+          // ignore: deprecated_member_use
           await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(screenWidth);
 
       final adUnitId = kReleaseMode
@@ -259,6 +280,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               setState(() {
                 _bannerAdWidget = AdWidget(ad: ad as BannerAd);
                 _isBannerLoaded = true;
+                _isBannerAdLoading = false;
               });
             }
           },
@@ -384,12 +406,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         entry.numbers.every((n) => result.contains(n)));
 
     if (!isAlreadySaved) {
+      final upcomingDrawNo = HistoryService.calculateTargetDrawNo(DateTime.now());
       final entry = LottoHistoryEntry(
-        title: 'VIP 행운 번호',
+        title: '제$upcomingDrawNo회 VIP 행운 번호',
         numbers: result,
         createdAt: DateTime.now(),
       );
       await HistoryService.save(entry);
+      await NotificationService.scheduleWeeklyDrawNotification();
       await _loadHistory();
     }
 
@@ -426,12 +450,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final result = picked.toList()..sort();
 
     setState(() => _customNumbers = result);
+    final upcomingDrawNo = HistoryService.calculateTargetDrawNo(DateTime.now());
     final entry = LottoHistoryEntry(
-      title: '맞춤 번호 조합',
+      title: '제$upcomingDrawNo회 맞춤 번호 조합',
       numbers: result,
       createdAt: DateTime.now(),
     );
-    HistoryService.save(entry).then((_) => _loadHistory());
+    await HistoryService.save(entry);
+    await NotificationService.scheduleWeeklyDrawNotification();
+    await _loadHistory();
     _showResultSheet('⚙️ 커스텀 맞춤 번호', result, false);
   }
 
@@ -701,18 +728,44 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
             body: Stack(
               children: [
+                // 🌟 1. 베이스 럭셔리 실크 그라데이션 (GPU 셰이더 연산, 메모리 0MB 소모)
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: AppColors.isLight
+                            ? const [
+                                Color(0xFFFCF9F3), // 샴페인 크림
+                                Color(0xFFF7F1E6), // 실크 아이보리
+                                Color(0xFFEFE6D5), // 웜 골드 언더톤
+                                Color(0xFFF5ECE0), // 소프트 캐시미어
+                              ]
+                            : const [
+                                Color(0xFF10121D), // 옵시디언 네이비
+                                Color(0xFF0C0E16), // 딥 미드나이트
+                                Color(0xFF07080D), // 퓨어 스페이스 블랙
+                              ],
+                        stops: AppColors.isLight ? const [0.0, 0.35, 0.75, 1.0] : const [0.0, 0.5, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+
+                // 🌟 2. 앰비언트 럭셔리 라이팅 오브 (자연스러운 깊이감)
                 if (AppColors.isLight) ...[
                   Positioned(
-                    top: -80,
-                    right: -60,
+                    top: -60,
+                    right: -40,
                     child: Container(
-                      width: 280,
-                      height: 280,
+                      width: 340,
+                      height: 340,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
                           colors: [
-                            AppColors.goldDark.withValues(alpha: 0.07),
+                            const Color(0xFFE5B842).withValues(alpha: 0.16),
                             Colors.transparent,
                           ],
                         ),
@@ -720,16 +773,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                   Positioned(
-                    bottom: 100,
-                    left: -80,
+                    top: 100,
+                    left: -70,
                     child: Container(
-                      width: 240,
-                      height: 240,
+                      width: 260,
+                      height: 260,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
                           colors: [
-                            const Color(0xFFD4A017).withValues(alpha: 0.06),
+                            const Color(0xFFF4C2A5).withValues(alpha: 0.12),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 80,
+                    left: -60,
+                    child: Container(
+                      width: 300,
+                      height: 300,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            const Color(0xFFD4AF37).withValues(alpha: 0.12),
                             Colors.transparent,
                           ],
                         ),
@@ -738,16 +808,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ] else ...[
                   Positioned(
-                    top: -120,
-                    right: -80,
+                    top: -80,
+                    right: -50,
                     child: Container(
-                      width: 320,
-                      height: 320,
+                      width: 360,
+                      height: 360,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
                           colors: [
-                            AppColors.gold.withValues(alpha: 0.07),
+                            AppColors.gold.withValues(alpha: 0.12),
                             Colors.transparent,
                           ],
                         ),
@@ -755,8 +825,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                   Positioned(
-                    bottom: 100,
-                    left: -100,
+                    top: 120,
+                    left: -80,
                     child: Container(
                       width: 280,
                       height: 280,
@@ -764,7 +834,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
                           colors: [
-                            AppColors.purple.withValues(alpha: 0.08),
+                            const Color(0xFF7B2CBF).withValues(alpha: 0.08),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 80,
+                    left: -80,
+                    child: Container(
+                      width: 300,
+                      height: 300,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            AppColors.purple.withValues(alpha: 0.10),
                             Colors.transparent,
                           ],
                         ),
@@ -795,8 +882,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildHeader() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: AppColors.isLight
           ? BoxDecoration(
               color: AppColors.surface,
@@ -833,26 +920,79 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 child: Text(
                   '로또 신통',
                   style: GoogleFonts.notoSansKr(
-                    fontSize: 26,
+                    fontSize: 24,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
-                    letterSpacing: 2,
+                    letterSpacing: 1.5,
                   ),
                 ),
               ),
               Text(
                 '프리미엄 번호 생성기',
                 style: GoogleFonts.notoSansKr(
-                  fontSize: 11,
+                  fontSize: 10.5,
                   color: AppColors.isLight ? AppColors.goldDeep.withValues(alpha: 0.7) : AppColors.textSecondary,
-                  letterSpacing: 1.8,
+                  letterSpacing: 1.4,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
           const Spacer(),
+          // 📷 QR 스캔 전용 버튼 (한눈에 알아볼 수 있는 에메랄드 뱃지)
+          InkWell(
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => QrScannerView(
+                    onHistorySaved: _loadHistory,
+                  ),
+                ),
+              );
+              _loadHistory();
+            },
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.isLight
+                    ? const Color(0xFFE8F8F5)
+                    : const Color(0xFF2ECC71).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFF2ECC71).withValues(alpha: 0.6),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF2ECC71).withValues(alpha: 0.18),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.qr_code_scanner_rounded, size: 15, color: Color(0xFF2ECC71)),
+                  const SizedBox(width: 3),
+                  Text(
+                    'QR스캔',
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.isLight ? const Color(0xFF145A32) : const Color(0xFFA9DFBF),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
           Container(
+            width: 34,
+            height: 34,
             decoration: AppColors.isLight
                 ? BoxDecoration(
                     shape: BoxShape.circle,
@@ -860,6 +1000,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   )
                 : null,
             child: IconButton(
+              padding: EdgeInsets.zero,
+              iconSize: 19,
               icon: Icon(
                 Icons.notifications_outlined,
                 color: AppColors.isLight ? AppColors.goldDeep : AppColors.textSecondary,
@@ -868,8 +1010,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onPressed: _showNotificationSettingsDialog,
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           Container(
+            width: 34,
+            height: 34,
             decoration: AppColors.isLight
                 ? BoxDecoration(
                     shape: BoxShape.circle,
@@ -877,6 +1021,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   )
                 : null,
             child: IconButton(
+              padding: EdgeInsets.zero,
+              iconSize: 19,
               icon: Icon(
                 AppTheme.themeModeNotifier.value == ThemeMode.light
                     ? Icons.dark_mode_rounded
@@ -887,14 +1033,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onPressed: AppTheme.toggleTheme,
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 3),
           GestureDetector(
             onTap: _showAppInfoDialog,
             behavior: HitTestBehavior.opaque,
             child: AnimatedBuilder(
               animation: _pulseCtrl,
               builder: (_, _) => Container(
-                padding: const EdgeInsets.all(10),
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: AppColors.isLight
@@ -913,15 +1061,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       color: AppColors.isLight
                           ? AppColors.goldDark.withValues(alpha: 0.25 + _pulseCtrl.value * 0.15)
                           : AppColors.gold.withValues(alpha: 0.1 + _pulseCtrl.value * 0.15),
-                      blurRadius: 16,
-                      spreadRadius: 2,
+                      blurRadius: 14,
+                      spreadRadius: 1,
                     ),
                   ],
                 ),
                 child: Icon(
                   Icons.workspace_premium,
                   color: AppColors.isLight ? Colors.white : AppColors.gold,
-                  size: 22,
+                  size: 19,
                 ),
               ),
             ),
@@ -976,18 +1124,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (!_isBannerLoaded || _bannerAd == null || _bannerAdWidget == null) return const SizedBox.shrink();
     return Container(
       alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: AppColors.isLight ? Colors.black.withValues(alpha: 0.05) : AppColors.borderSubtle,
-            width: 0.5,
-          ),
-        ),
-      ),
+      color: AppColors.surface,
       width: double.infinity,
-      height: _bannerAd!.size.height.toDouble() + 8,
+      height: _bannerAd!.size.height.toDouble(),
       child: SizedBox(
         width: _bannerAd!.size.width.toDouble(),
         height: _bannerAd!.size.height.toDouble(),

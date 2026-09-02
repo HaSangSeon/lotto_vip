@@ -38,9 +38,11 @@ class _ResultSheetState extends State<ResultSheet> {
         final directory = await getTemporaryDirectory();
         final imagePath = await File('${directory.path}/lotto_vip_result.png').create();
         await imagePath.writeAsBytes(image);
-        await Share.shareXFiles(
-          [XFile(imagePath.path)],
-          text: '내 로또 신통 번호: ${widget.numbers.join(', ')}',
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile(imagePath.path)],
+            text: '내 로또 신통 번호: ${widget.numbers.join(', ')}',
+          ),
         );
       }
     } catch (e) {

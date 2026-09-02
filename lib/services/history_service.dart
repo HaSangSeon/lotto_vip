@@ -7,21 +7,50 @@ enum LottoEntryType {
   qrScan, // 실제 구매 복권 (QR 스캔)
 }
 
+class SavedLotteryGame {
+  final String label; // A, B, C, D, E
+  final List<int> numbers; // 6 numbers
+
+  const SavedLotteryGame({
+    required this.label,
+    required this.numbers,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'label': label,
+        'numbers': numbers,
+      };
+
+  factory SavedLotteryGame.fromJson(Map<String, dynamic> json) =>
+      SavedLotteryGame(
+        label: json['label'] ?? '',
+        numbers: List<int>.from(json['numbers'] ?? []),
+      );
+}
+
 class LottoHistoryEntry {
   final String title;
   final List<int> numbers;
+  final List<SavedLotteryGame>? games; // 실물 복권인 경우 복수 게임(A~E)
   final DateTime createdAt;
   bool isFavorite;
 
   LottoHistoryEntry({
     required this.title,
     required this.numbers,
+    this.games,
     required this.createdAt,
     this.isFavorite = false,
   });
 
+  /// 묶음 실물 복권 여부 (여러 게임을 포함하는 티켓)
+  bool get isTicket => games != null && games!.isNotEmpty;
+
+  /// 게임 개수 (단일 번호면 1, 묶음 티켓이면 게임 개수)
+  int get gameCount => isTicket ? games!.length : 1;
+
   LottoEntryType get entryType {
-    if (title.contains('QR') || title.contains('스캔')) {
+    if (title.contains('QR') || title.contains('스캔') || isTicket) {
       return LottoEntryType.qrScan;
     } else if (title.contains('VIP') || title.contains('행운')) {
       return LottoEntryType.vipLucky;
@@ -33,7 +62,7 @@ class LottoHistoryEntry {
   String get typeBadgeLabel {
     switch (entryType) {
       case LottoEntryType.qrScan:
-        return '🎫 실물 복권';
+        return isTicket ? '🎫 실물 복권 ($gameCount게임)' : '🎫 실물 복권';
       case LottoEntryType.vipLucky:
         return '👑 VIP 행운';
       case LottoEntryType.custom:
@@ -49,16 +78,13 @@ class LottoHistoryEntry {
       if (parsed != null && parsed > 0) return parsed;
     }
 
-    // 1회차: 2002년 12월 7일 (토) 20:00 마감
-    final firstDrawDate = DateTime(2002, 12, 7, 20, 0, 0);
-    final diff = createdAt.difference(firstDrawDate);
-    if (diff.isNegative) return 1;
-    return (diff.inDays / 7).floor() + 1;
+    return HistoryService.calculateTargetDrawNo(createdAt);
   }
 
   Map<String, dynamic> toJson() => {
         'title': title,
         'numbers': numbers,
+        if (games != null) 'games': games!.map((g) => g.toJson()).toList(),
         'createdAt': createdAt.toIso8601String(),
         'isFavorite': isFavorite,
       };
@@ -67,6 +93,12 @@ class LottoHistoryEntry {
       LottoHistoryEntry(
         title: json['title'] ?? '보관된 번호',
         numbers: List<int>.from(json['numbers'] ?? []),
+        games: json['games'] != null
+            ? (json['games'] as List)
+                .map((e) =>
+                    SavedLotteryGame.fromJson(Map<String, dynamic>.from(e)))
+                .toList()
+            : null,
         createdAt: json['createdAt'] != null
             ? DateTime.tryParse(json['createdAt']) ?? DateTime.now()
             : DateTime.now(),
@@ -76,12 +108,13 @@ class LottoHistoryEntry {
 
 class HistoryService {
   static const _key = 'lotto_history';
-  static const _maxEntries = 30;
+  static const _maxEntries = 500; // 30개 제한에서 500개로 대폭 확장
 
   /// 최근 생성순(최신순)으로 정렬하여 로드
   static Future<List<LottoHistoryEntry>> load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
       final raw = prefs.getStringList(_key) ?? [];
       final entries = raw
           .map((e) => LottoHistoryEntry.fromJson(jsonDecode(e)))
@@ -137,5 +170,33 @@ class HistoryService {
   static Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_key);
+  }
+
+  /// 특정 일시(생성일 등) 기준 대상 로또 추첨 회차 계산
+  /// 매주 토요일 20:00 이전 생성 -> 이번 주 토요일 추첨 회차
+  /// 매주 토요일 20:00 이후 생성 -> 다음 주 토요일 추첨 회차
+  static int calculateTargetDrawNo(DateTime dateTime) {
+    final firstDrawSaturday = DateTime(2002, 12, 7, 20, 0, 0);
+    if (dateTime.isBefore(firstDrawSaturday)) return 1;
+
+    int daysUntilSaturday = DateTime.saturday - dateTime.weekday;
+    if (daysUntilSaturday < 0) {
+      daysUntilSaturday += 7;
+    } else if (daysUntilSaturday == 0) {
+      if (dateTime.hour > 20 || (dateTime.hour == 20 && dateTime.minute > 0)) {
+        daysUntilSaturday = 7;
+      }
+    }
+
+    final targetSaturday = DateTime(
+      dateTime.year,
+      dateTime.month,
+      dateTime.day + daysUntilSaturday,
+      20,
+      0,
+      0,
+    );
+    final diff = targetSaturday.difference(firstDrawSaturday);
+    return (diff.inDays / 7).round() + 1;
   }
 }
