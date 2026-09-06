@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -54,29 +55,32 @@ class _ResultSheetState extends State<ResultSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: AppColors.isLight
-              ? const [Color(0xFFFFFDF5), Color(0xFFFFF8E5)]
-              : const [Color(0xFF1E1800), Color(0xFF0F0D00)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.4), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.gold.withValues(alpha: 0.15),
-            blurRadius: 30,
-            spreadRadius: 5,
+    return SafeArea(
+      top: false,
+      bottom: true,
+      child: Container(
+        margin: EdgeInsets.fromLTRB(16, 16, 16, max(16.0, MediaQuery.of(context).padding.bottom + 8.0)),
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: AppColors.isLight
+                ? const [Color(0xFFFFFDF5), Color(0xFFFFF8E5)]
+                : const [Color(0xFF1E1800), Color(0xFF0F0D00)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: AppColors.gold.withValues(alpha: 0.4), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.gold.withValues(alpha: 0.15),
+              blurRadius: 30,
+              spreadRadius: 5,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
         children: [
           // Handle
           Container(
@@ -219,6 +223,7 @@ class _ResultSheetState extends State<ResultSheet> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

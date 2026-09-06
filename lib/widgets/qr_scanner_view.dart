@@ -102,9 +102,10 @@ class _QrScannerViewState extends State<QrScannerView> {
             createdAt: DateTime.now(),
           );
           await HistoryService.save(ticketEntry);
-          // 토요일 맞춤 알림 스케줄 즉시 갱신
-          await NotificationService.scheduleWeeklyDrawNotification();
         }
+
+        // 신규 저장이든 기존 복권 재스캔이든 이번 주 토요일 맞춤 알림 스케줄을 100% 확실히 갱신/보장
+        await NotificationService.scheduleWeeklyDrawNotification();
 
         widget.onHistorySaved?.call();
 

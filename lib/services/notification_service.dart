@@ -77,12 +77,59 @@ class NotificationService {
 
       _isInitialized = true;
 
-      // 4. 활성화 상태라면 토요일 알람 스케줄 등록
+      // 4. 활성화 상태라면 권한 확인 및 토요일 알람 스케줄 등록
       if (_isEnabled) {
+        final hasPermission = await areNotificationsEnabled();
+        if (!hasPermission) {
+          await requestPermission();
+        }
         await scheduleWeeklyDrawNotification();
       }
     } catch (e) {
       debugPrint('NotificationService init error: $e');
+    }
+  }
+
+  /// OS 시스템 레벨에서 앱의 알림이 허용되어 있는지 확인
+  static Future<bool> areNotificationsEnabled() async {
+    try {
+      final androidPlugin = _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      if (androidPlugin != null) {
+        final enabled = await androidPlugin.areNotificationsEnabled();
+        return enabled ?? false;
+      }
+
+      final iosPlugin = _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>();
+      if (iosPlugin != null) {
+        final permissions = await iosPlugin.checkPermissions();
+        return permissions?.isEnabled ?? false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error checking notification permission: $e');
+      return true;
+    }
+  }
+
+  /// Android 12+ 정확한 알람(Exact Alarm) 예약 가능 여부 확인
+  static Future<bool> canScheduleExactNotifications() async {
+    try {
+      if (defaultTargetPlatform != TargetPlatform.android) return true;
+      final androidPlugin = _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      if (androidPlugin != null) {
+        final canExact = await androidPlugin.canScheduleExactNotifications();
+        return canExact ?? true;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error checking exact alarm capability: $e');
+      return true;
     }
   }
 
@@ -163,6 +210,9 @@ class NotificationService {
         channelDescription: _channelDescription,
         importance: Importance.max,
         priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+        visibility: NotificationVisibility.public,
         icon: '@mipmap/ic_launcher',
       );
 
@@ -178,21 +228,47 @@ class NotificationService {
         iOS: iosDetails,
       );
 
-      await _notificationsPlugin.cancel(_weeklyNotificationId);
-      await _notificationsPlugin.zonedSchedule(
-        _weeklyNotificationId,
-        title,
-        body,
-        scheduledDate,
-        platformDetails,
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-        payload: payload,
-      );
+      // 정확한 알람(Exact Alarm) 가능 여부 확인 후 최적의 스케줄 모드 지정 (정시 발송 보장)
+      AndroidScheduleMode scheduleMode = AndroidScheduleMode.exactAllowWhileIdle;
+      final canExact = await canScheduleExactNotifications();
+      if (!canExact) {
+        scheduleMode = AndroidScheduleMode.inexactAllowWhileIdle;
+        debugPrint('Exact alarm not supported or permitted, falling back to inexactAllowWhileIdle');
+      }
 
-      debugPrint('Weekly notification scheduled for: $scheduledDate (Custom ticket: ${registeredTickets.isNotEmpty})');
+      await _notificationsPlugin.cancel(_weeklyNotificationId);
+
+      // [2중 안전망] 1차 정확한 알람 시도 -> 예외 발생 시 즉시 inexact로 재시도하여 100% 등록 보장
+      try {
+        await _notificationsPlugin.zonedSchedule(
+          _weeklyNotificationId,
+          title,
+          body,
+          scheduledDate,
+          platformDetails,
+          androidScheduleMode: scheduleMode,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+          payload: payload,
+        );
+      } catch (scheduleErr) {
+        debugPrint('Primary zonedSchedule failed ($scheduleErr), retrying with inexact fallback...');
+        await _notificationsPlugin.zonedSchedule(
+          _weeklyNotificationId,
+          title,
+          body,
+          scheduledDate,
+          platformDetails,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+          payload: payload,
+        );
+      }
+
+      debugPrint('Weekly notification successfully scheduled for: $scheduledDate (Mode: $scheduleMode, Custom ticket: ${registeredTickets.isNotEmpty})');
     } catch (e) {
       debugPrint('Failed to schedule weekly notification: $e');
     }
@@ -264,6 +340,102 @@ class NotificationService {
       );
     } catch (e) {
       debugPrint('Failed to show test notification: $e');
+    }
+  }
+
+  /// [실제 예약 알림 검증용] 10초(또는 지정 초) 뒤 예약 알림 발송 테스트
+  /// 토요일 20:45 알림과 100% 동일한 zonedSchedule + AlarmManager + Receiver 경로를 거칩니다.
+  /// 화면을 끄거나 앱을 닫은 상태에서도 실제 알람이 오는지 지금 바로 검증할 수 있습니다.
+  static Future<bool> scheduleTestDelayedNotification({int seconds = 10}) async {
+    try {
+      await requestPermission();
+
+      final scheduledDate = tz.TZDateTime.now(tz.local).add(Duration(seconds: seconds));
+
+      final upcomingDrawNo = getUpcomingDrawNo();
+      final history = await HistoryService.load();
+      final registeredTickets = history.where((e) => e.drawNo >= upcomingDrawNo).toList();
+
+      final String title;
+      final String body;
+      final String payload;
+
+      if (registeredTickets.isNotEmpty) {
+        final ticket = registeredTickets.first;
+        final totalGames = registeredTickets.fold(0, (sum, t) => sum + t.gameCount);
+        title = '🎫 [제${ticket.drawNo}회] 보관함 번호 추첨 완료!';
+        body = '등록해두신 번호($totalGames게임)의 추첨이 끝났습니다. 지금 당첨 결과를 확인해보세요! 🎰';
+        payload = 'lotto_draw_result:${ticket.drawNo}';
+      } else {
+        title = '💰 혹시… 이번 주 1등 당첨자이신가요?';
+        body = '로또 추첨이 완료되었습니다. 저장해둔 내 번호와 지금 맞춰보세요! 🎰';
+        payload = 'lotto_draw_result';
+      }
+
+      const AndroidNotificationDetails androidDetails =
+          AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        channelDescription: _channelDescription,
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+        visibility: NotificationVisibility.public,
+        icon: '@mipmap/ic_launcher',
+      );
+
+      const DarwinNotificationDetails iosDetails =
+          DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      const NotificationDetails platformDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      AndroidScheduleMode scheduleMode = AndroidScheduleMode.exactAllowWhileIdle;
+      final canExact = await canScheduleExactNotifications();
+      if (!canExact) {
+        scheduleMode = AndroidScheduleMode.inexactAllowWhileIdle;
+      }
+
+      await _notificationsPlugin.cancel(_testNotificationId);
+
+      try {
+        await _notificationsPlugin.zonedSchedule(
+          _testNotificationId,
+          title,
+          body,
+          scheduledDate,
+          platformDetails,
+          androidScheduleMode: scheduleMode,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: payload,
+        );
+      } catch (err) {
+        await _notificationsPlugin.zonedSchedule(
+          _testNotificationId,
+          title,
+          body,
+          scheduledDate,
+          platformDetails,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: payload,
+        );
+      }
+
+      debugPrint('Test delayed notification scheduled for $seconds seconds later: $scheduledDate');
+      return true;
+    } catch (e) {
+      debugPrint('Failed to schedule test delayed notification: $e');
+      return false;
     }
   }
 

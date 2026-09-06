@@ -350,7 +350,7 @@ class CustomTab extends StatelessWidget {
     final bool hasValue = count > 0;
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
       decoration: BoxDecoration(
         color: isLight ? const Color(0xFFFBF9F4) : const Color(0xFF131724),
         borderRadius: BorderRadius.circular(16),
@@ -373,31 +373,37 @@ class CustomTab extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: isLight ? 0.12 : 0.2),
-                      shape: BoxShape.circle,
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(3.5),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: isLight ? 0.12 : 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, size: 13, color: color),
                     ),
-                    child: Icon(icon, size: 14, color: color),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    title,
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 4),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                 decoration: BoxDecoration(
                   color: hasValue
                       ? color.withValues(alpha: isLight ? 0.12 : 0.2)
@@ -418,8 +424,10 @@ class CustomTab extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             desc,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.notoSansKr(
-              fontSize: 11,
+              fontSize: 10.5,
               color: AppColors.textSecondary,
               height: 1.3,
             ),

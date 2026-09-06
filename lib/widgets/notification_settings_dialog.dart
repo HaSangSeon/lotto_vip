@@ -15,11 +15,22 @@ class _NotificationSettingsDialogState
     extends State<NotificationSettingsDialog> {
   bool _isEnabled = true;
   bool _isLoading = false;
+  bool _hasSystemPermission = true;
 
   @override
   void initState() {
     super.initState();
     _isEnabled = NotificationService.isEnabled;
+    _checkSystemPermission();
+  }
+
+  Future<void> _checkSystemPermission() async {
+    final granted = await NotificationService.areNotificationsEnabled();
+    if (mounted) {
+      setState(() {
+        _hasSystemPermission = granted;
+      });
+    }
   }
 
   Future<void> _toggleNotification(bool value) async {
@@ -28,10 +39,12 @@ class _NotificationSettingsDialogState
     });
 
     await NotificationService.setNotificationEnabled(value);
+    final granted = await NotificationService.areNotificationsEnabled();
 
     if (mounted) {
       setState(() {
         _isEnabled = value;
+        _hasSystemPermission = granted;
         _isLoading = false;
       });
 
@@ -51,18 +64,22 @@ class _NotificationSettingsDialogState
     }
   }
 
-  Future<void> _sendTestNotification() async {
-    await NotificationService.showTestNotification();
+
+
+  Future<void> _sendTestDelayedNotification() async {
+    final success = await NotificationService.scheduleTestDelayedNotification(seconds: 10);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '📨 테스트 알림이 발송되었습니다. 상단 알림 바를 확인해보세요!',
-            style: GoogleFonts.notoSansKr(color: Colors.white, fontSize: 13),
+            success
+                ? '⏱️ 10초 뒤 예약 알림이 등록되었습니다!\n지금 바로 스마트폰 화면을 끄고 10초만 기다려보세요! 🔔'
+                : '⚠️ 예약 알림 등록에 실패했습니다. 권한을 확인해주세요.',
+            style: GoogleFonts.notoSansKr(color: Colors.white, fontSize: 13, height: 1.3),
           ),
-          backgroundColor: AppColors.goldDark,
+          backgroundColor: success ? AppColors.goldDark : Colors.redAccent,
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
+          duration: const Duration(seconds: 5),
         ),
       );
     }
@@ -230,6 +247,44 @@ class _NotificationSettingsDialogState
               ),
             ),
 
+            // 스마트폰 시스템 레벨 알림 차단 시 경고 배너
+            if (_isEnabled && !_hasSystemPermission) ...[
+              const SizedBox(height: 10),
+              InkWell(
+                onTap: () async {
+                  await NotificationService.requestPermission();
+                  _checkSystemPermission();
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.shade700, width: 1),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.amber.shade700, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '스마트폰 시스템 알림이 꺼져 있습니다.\n여기를 눌러 알림 권한을 허용해 주세요.',
+                          style: GoogleFonts.notoSansKr(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.amber.shade900,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: Colors.amber.shade700, size: 18),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+
             const SizedBox(height: 16),
 
             // 알림 메시지 미리보기 박스
@@ -283,32 +338,33 @@ class _NotificationSettingsDialogState
 
             const SizedBox(height: 20),
 
-            // 테스트 발송 버튼
+            // 10초 뒤 예약 알림 테스트 버튼 (AlarmManager 및 잠금화면 검증용)
             OutlinedButton.icon(
-              onPressed: _sendTestNotification,
-              icon: const Icon(Icons.send_rounded, size: 16),
+              onPressed: _sendTestDelayedNotification,
+              icon: const Icon(Icons.timer_outlined, size: 16),
               label: Text(
-                '지금 테스트 알림 받아보기',
+                '⏱️ 10초 뒤 예약 알림 테스트 (화면 끄고 확인)',
                 style: GoogleFonts.notoSansKr(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.goldText,
+                backgroundColor: AppColors.gold.withValues(alpha: 0.08),
                 side: BorderSide(
                   color: AppColors.isLight
                       ? const Color(0xFFD4AF37)
                       : AppColors.gold.withValues(alpha: 0.6),
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
             // 닫기 버튼 (프리미엄 라운드 버튼)
             SizedBox(

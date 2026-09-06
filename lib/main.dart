@@ -28,6 +28,11 @@ import 'dart:ui' as ui;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+  
   FlutterError.onError = (FlutterErrorDetails details) {
     debugPrint('FlutterError caught safely: ${details.exception}');
   };
@@ -79,7 +84,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   BannerAd? _bannerAd;
   Widget? _bannerAdWidget;
   bool _isBannerLoaded = false;
@@ -106,6 +112,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadSavedBirthDate();
     _loadSavedCustomFilters();
     _loadInterstitialAd();
@@ -122,6 +129,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     )..repeat(reverse: true);
 
     NotificationService.onNotificationPayload.addListener(_onNotificationTapped);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // 앱이 화면으로 돌아왔을 때 알림 스케줄 자가 치유(Auto-Healing)
+      if (NotificationService.isEnabled) {
+        NotificationService.scheduleWeeklyDrawNotification();
+      }
+    }
   }
 
   void _onNotificationTapped() {
@@ -157,6 +174,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     NotificationService.onNotificationPayload.removeListener(_onNotificationTapped);
     _shimmerCtrl.dispose();
     _pulseCtrl.dispose();
@@ -479,6 +497,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (ctx) => ResultSheet(
         title: title,
         numbers: numbers,
@@ -494,6 +513,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => CustomSettingsSheet(
         includeNumbers: List.from(_includeNumbers),
