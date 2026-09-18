@@ -6,13 +6,20 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_theme.dart';
 import 'common_widgets.dart';
 import 'lotto_ball.dart';
+import 'vip/dream_tab_view.dart';
+import 'custom_tab.dart';
 
-class VipTab extends StatelessWidget {
+class VipTab extends StatefulWidget {
   final TextEditingController ctrl;
   final List<int> vipNumbers;
   final VoidCallback onGenerate;
   final ValueChanged<String>? onBirthDateChanged;
   final AnimationController shimmerCtrl;
+  final List<int> customNumbers;
+  final List<int> includeNumbers;
+  final List<int> excludeNumbers;
+  final VoidCallback onOpenCustomDialog;
+  final VoidCallback onGenerateCustom;
 
   const VipTab({
     super.key,
@@ -21,16 +28,135 @@ class VipTab extends StatelessWidget {
     required this.onGenerate,
     this.onBirthDateChanged,
     required this.shimmerCtrl,
+    required this.customNumbers,
+    required this.includeNumbers,
+    required this.excludeNumbers,
+    required this.onOpenCustomDialog,
+    required this.onGenerateCustom,
   });
 
   @override
+  State<VipTab> createState() => _VipTabState();
+}
+
+class _VipTabState extends State<VipTab> {
+  int _selectedIndex = 0;
+
+  @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
       child: Column(
         children: [
-          // VIP 카드
-          GlassCard(
+          // 모드 전환 스위치
+          Container(
+            margin: const EdgeInsets.only(bottom: 20, top: 4),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppColors.isLight ? Colors.black.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedIndex = 0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _selectedIndex == 0 
+                            ? (AppColors.isLight ? Colors.white : AppColors.surface)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: _selectedIndex == 0 ? [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))
+                        ] : null,
+                      ),
+                      child: Text(
+                        '🌙 꿈 해몽',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.notoSansKr(
+                          fontWeight: _selectedIndex == 0 ? FontWeight.bold : FontWeight.w500,
+                          fontSize: 13,
+                          color: _selectedIndex == 0 ? (AppColors.isLight ? AppColors.goldDark : AppColors.gold) : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedIndex = 1),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _selectedIndex == 1 
+                            ? (AppColors.isLight ? Colors.white : AppColors.surface)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: _selectedIndex == 1 ? [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))
+                        ] : null,
+                      ),
+                      child: Text(
+                        '🎂 생년월일',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.notoSansKr(
+                          fontWeight: _selectedIndex == 1 ? FontWeight.bold : FontWeight.w500,
+                          fontSize: 13,
+                          color: _selectedIndex == 1 ? AppColors.textPrimary : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedIndex = 2),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _selectedIndex == 2 
+                            ? (AppColors.isLight ? Colors.white : AppColors.surface)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: _selectedIndex == 2 ? [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))
+                        ] : null,
+                      ),
+                      child: Text(
+                        '⚙️ 맞춤 필터',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.notoSansKr(
+                          fontWeight: _selectedIndex == 2 ? FontWeight.bold : FontWeight.w500,
+                          fontSize: 13,
+                          color: _selectedIndex == 2 ? AppColors.textPrimary : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          Expanded(
+            child: _selectedIndex == 0
+                ? const DreamTabView()
+                : _selectedIndex == 2
+                    ? CustomTab(
+                        customNumbers: widget.customNumbers,
+                        includeNumbers: widget.includeNumbers,
+                        excludeNumbers: widget.excludeNumbers,
+                        onOpenDialog: widget.onOpenCustomDialog,
+                        onGenerate: widget.onGenerateCustom,
+                      )
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: Column(
+                          children: [
+                            // VIP 카드
+                            GlassCard(
             gradientColors: AppColors.isLight
                 ? const [Color(0xFFFFFEFA), Color(0xFFFFF8E0)]
                 : const [Color(0xFF1E1800), Color(0xFF0F0D00)],
@@ -111,8 +237,8 @@ class VipTab extends StatelessWidget {
 
                 // 입력 필드
                 TextField(
-                  controller: ctrl,
-                  onChanged: onBirthDateChanged,
+                  controller: widget.ctrl,
+                  onChanged: widget.onBirthDateChanged,
                   keyboardType: TextInputType.number,
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
@@ -164,7 +290,7 @@ class VipTab extends StatelessWidget {
                             ],
                           ),
                           child: ElevatedButton.icon(
-                            onPressed: onGenerate,
+                            onPressed: widget.onGenerate,
                             icon: const Icon(Icons.auto_awesome, size: 20, color: Colors.white),
                             label: Text(
                               '🍀 오늘 나의 행운 번호 뽑기',
@@ -181,7 +307,7 @@ class VipTab extends StatelessWidget {
                           ),
                         )
                       : ElevatedButton.icon(
-                          onPressed: onGenerate,
+                          onPressed: widget.onGenerate,
                           icon: const Icon(Icons.auto_awesome, size: 20),
                           label: Text(
                             '🍀 오늘 나의 행운 번호 뽑기',
@@ -204,7 +330,7 @@ class VipTab extends StatelessWidget {
           const SizedBox(height: 20),
 
           // 결과 카드
-          if (vipNumbers.isNotEmpty)
+          if (widget.vipNumbers.isNotEmpty)
             GlassCard(
               gradientColors: AppColors.isLight
                   ? const [Color(0xFFFFFDF5), Color(0xFFFFF8E5)]
@@ -228,7 +354,7 @@ class VipTab extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  LottoBallRow(numbers: vipNumbers, ballSize: 48)
+                  LottoBallRow(numbers: widget.vipNumbers, ballSize: 48)
                       .animate()
                       .fadeIn(duration: 500.ms)
                       .slideY(begin: 0.3, end: 0, duration: 500.ms, curve: Curves.easeOutBack),
@@ -257,6 +383,10 @@ class VipTab extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+                          ],
+                        ),
+                      ),
           ),
         ],
       ),

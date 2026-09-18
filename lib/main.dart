@@ -16,7 +16,7 @@ import 'services/notification_service.dart';
 import 'widgets/splash_screen.dart';
 import 'widgets/latest_draw_tab.dart';
 import 'widgets/vip_tab.dart';
-import 'widgets/custom_tab.dart';
+import 'widgets/statistics_tab.dart';
 import 'widgets/history_tab.dart';
 import 'widgets/custom_settings_sheet.dart';
 import 'widgets/result_sheet.dart';
@@ -67,6 +67,13 @@ class LottoVipApp extends StatelessWidget {
           theme: AppThemes.light,
           darkTheme: AppThemes.dark,
           themeMode: themeMode,
+          builder: (context, child) {
+            return MediaQuery.withClampedTextScaling(
+              minScaleFactor: 1.0,
+              maxScaleFactor: 1.15, // 최대 1.15배까지만 폰트 크기 증가 허용
+              child: child!,
+            );
+          },
           home: const SplashScreen(nextScreen: HomeScreen()),
         );
       },
@@ -525,10 +532,6 @@ class _HomeScreenState extends State<HomeScreen>
           });
           _saveCustomFilters(inc, exc);
         },
-        onGenerate: () {
-          Navigator.pop(context);
-          _generateCustomNumbers();
-        },
       ),
     );
   }
@@ -740,8 +743,8 @@ class _HomeScreenState extends State<HomeScreen>
                       unselectedLabelStyle: GoogleFonts.notoSansKr(fontSize: 11),
                       items: const [
                         BottomNavigationBarItem(icon: Icon(Icons.emoji_events_rounded), label: '당첨 확인'),
-                        BottomNavigationBarItem(icon: Icon(Icons.auto_awesome), label: '오늘의 행운'),
-                        BottomNavigationBarItem(icon: Icon(Icons.tune_rounded), label: '맞춤 조합'),
+                        BottomNavigationBarItem(icon: Icon(Icons.auto_awesome), label: '프리미엄 추출'),
+                        BottomNavigationBarItem(icon: Icon(Icons.analytics_rounded), label: '통계 분석'),
                         BottomNavigationBarItem(icon: Icon(Icons.history_rounded), label: '보관함'),
                       ],
                     ),
@@ -1125,15 +1128,15 @@ class _HomeScreenState extends State<HomeScreen>
           onGenerate: _generateVipNumbers,
           onBirthDateChanged: _onBirthDateChanged,
           shimmerCtrl: _shimmerCtrl,
-        );
-      case 2:
-        return CustomTab(
-          key: ValueKey('custom_$mode'),
           customNumbers: _customNumbers,
           includeNumbers: _includeNumbers,
           excludeNumbers: _excludeNumbers,
-          onOpenDialog: _openCustomDialog,
-          onGenerate: _generateCustomNumbers,
+          onOpenCustomDialog: _openCustomDialog,
+          onGenerateCustom: _generateCustomNumbers,
+        );
+      case 2:
+        return StatisticsTab(
+          key: ValueKey('stat_$mode'),
         );
       default:
         return HistoryTab(

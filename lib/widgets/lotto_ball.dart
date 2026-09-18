@@ -103,16 +103,22 @@ class LottoBall extends StatelessWidget {
                 ),
               ),
             ),
-            Text(
-              number.toString(),
-              style: GoogleFonts.rajdhani(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: fontSize,
-                height: 1.0,
-                shadows: const [
-                  Shadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 1.5)),
-                ],
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Padding(
+                padding: EdgeInsets.all(size * 0.1),
+                child: Text(
+                  number.toString(),
+                  style: GoogleFonts.rajdhani(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: fontSize,
+                    height: 1.0,
+                    shadows: const [
+                      Shadow(color: Colors.black54, blurRadius: 4, offset: Offset(0, 1.5)),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],

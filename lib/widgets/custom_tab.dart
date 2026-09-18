@@ -97,100 +97,7 @@ class CustomTab extends StatelessWidget {
 
                 const SizedBox(height: 20),
 
-                // 2. 2열 고정수 / 제외수 안내 & 상태 카드
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // 고정수 (포함) 카드
-                      Expanded(
-                        child: _buildConceptCard(
-                          icon: Icons.add_circle_outline_rounded,
-                          title: '고정수 (포함)',
-                          desc: '꼭 넣을 번호 (최대 5개)',
-                          count: includeNumbers.length,
-                          color: const Color(0xFF1976D2),
-                          isLight: isLight,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-
-                      // 제외수 (제외) 카드
-                      Expanded(
-                        child: _buildConceptCard(
-                          icon: Icons.remove_circle_outline_rounded,
-                          title: '제외수 (제외)',
-                          desc: '조합에서 뺄 번호 (최대 39개)',
-                          count: excludeNumbers.length,
-                          color: const Color(0xFFD32F2F),
-                          isLight: isLight,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // 3. 필터 적용 상태 스마트 배너
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: hasFilter
-                        ? (isLight ? const Color(0xFFFFF9E6) : AppColors.gold.withValues(alpha: 0.08))
-                        : (isLight ? const Color(0xFFF6F3EC) : Colors.white.withValues(alpha: 0.04)),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: hasFilter
-                          ? (isLight ? AppColors.lightGoldBorder.withValues(alpha: 0.5) : AppColors.borderGold.withValues(alpha: 0.3))
-                          : (isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.06)),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        hasFilter ? Icons.verified_rounded : Icons.info_outline_rounded,
-                        size: 15,
-                        color: hasFilter
-                            ? (isLight ? AppColors.goldDeep : AppColors.gold)
-                            : AppColors.textHint,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          hasFilter
-                              ? '고정수 ${includeNumbers.length}개 · 제외수 ${excludeNumbers.length}개가 적용 중입니다.'
-                              : '설정된 필터가 없어 전체(1~45번)에서 무작위로 추출됩니다.',
-                          style: GoogleFonts.notoSansKr(
-                            color: hasFilter
-                                ? (isLight ? AppColors.goldDeep : AppColors.gold)
-                                : AppColors.textSecondary,
-                            fontSize: 11.5,
-                            fontWeight: hasFilter ? FontWeight.w700 : FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // 4. 설정된 번호 칩 표시 (필터가 있을 때)
-                if (hasFilter) ...[
-                  const SizedBox(height: 16),
-                  if (includeNumbers.isNotEmpty) ...[
-                    _buildSelectedNumberList('포함할 고정수', includeNumbers, const Color(0xFF1976D2), isLight),
-                    const SizedBox(height: 12),
-                  ],
-                  if (excludeNumbers.isNotEmpty) ...[
-                    _buildSelectedNumberList('제외할 번호', excludeNumbers, const Color(0xFFD32F2F), isLight),
-                    const SizedBox(height: 12),
-                  ],
-                ],
-
-                const SizedBox(height: 16),
-
-                // 5. 1단계: 고정수/제외수 상세 필터 버튼
+                // 2. 1단계: 고정수/제외수 상세 필터 버튼 (최상단으로 이동)
                 SizedBox(
                   width: double.infinity,
                   child: Container(
@@ -234,9 +141,22 @@ class CustomTab extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: 24),
 
-                // 6. 2단계: 메인 액션 버튼 (맞춤 번호 조합 추출하기)
+                // 3. 설정된 번호 칩 표시 (필터가 있을 때만 노출)
+                if (hasFilter) ...[
+                  if (includeNumbers.isNotEmpty) ...[
+                    _buildSelectedNumberList('포함할 고정수', includeNumbers, const Color(0xFF1976D2), isLight),
+                    const SizedBox(height: 12),
+                  ],
+                  if (excludeNumbers.isNotEmpty) ...[
+                    _buildSelectedNumberList('제외할 번호', excludeNumbers, const Color(0xFFD32F2F), isLight),
+                    const SizedBox(height: 12),
+                  ],
+                  const SizedBox(height: 12),
+                ],
+
+                // 4. 2단계: 메인 액션 버튼 (맞춤 번호 조합 추출하기)
                 SizedBox(
                   width: double.infinity,
                   child: isLight
@@ -278,7 +198,28 @@ class CustomTab extends StatelessWidget {
                           ),
                         )
                       : ElevatedButton.icon(
-                          onPressed: onGenerate,
+                          onPressed: () {
+                            if (includeNumbers.isEmpty && excludeNumbers.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '고정수나 제외수를 최소 1개 이상 선택해 주세요!',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.notoSansKr(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  backgroundColor: const Color(0xFFD32F2F),
+                                  behavior: SnackBarBehavior.floating,
+                                  margin: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              );
+                              return;
+                            }
+                            onGenerate();
+                          },
                           icon: const Icon(Icons.bolt_rounded, color: Colors.black, size: 22),
                           label: Text(
                             '⚡ 맞춤 번호 조합 추출하기',
@@ -338,104 +279,7 @@ class CustomTab extends StatelessWidget {
     );
   }
 
-  /// 고정수/제외수 개념 및 상태를 보여주는 2단 인포 카드
-  Widget _buildConceptCard({
-    required IconData icon,
-    required String title,
-    required String desc,
-    required int count,
-    required Color color,
-    required bool isLight,
-  }) {
-    final bool hasValue = count > 0;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-      decoration: BoxDecoration(
-        color: isLight ? const Color(0xFFFBF9F4) : const Color(0xFF131724),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: hasValue
-              ? color.withValues(alpha: 0.45)
-              : (isLight ? AppColors.lightGoldBorder.withValues(alpha: 0.3) : AppColors.borderSubtle),
-          width: 1.1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isLight ? 0.02 : 0.15),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(3.5),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: isLight ? 0.12 : 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, size: 13, color: color),
-                    ),
-                    const SizedBox(width: 5),
-                    Flexible(
-                      child: Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                decoration: BoxDecoration(
-                  color: hasValue
-                      ? color.withValues(alpha: isLight ? 0.12 : 0.2)
-                      : (isLight ? Colors.black.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.05)),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  hasValue ? '$count개' : '0개',
-                  style: GoogleFonts.rajdhani(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: hasValue ? color : AppColors.textHint,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            desc,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.notoSansKr(
-              fontSize: 10.5,
-              color: AppColors.textSecondary,
-              height: 1.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// 설정된 고정수/제외수 번호 칩 리스트
   Widget _buildSelectedNumberList(String label, List<int> numbers, Color color, bool isLight) {

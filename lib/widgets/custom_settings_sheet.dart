@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
@@ -7,15 +6,13 @@ import '../theme/app_theme.dart';
 class CustomSettingsSheet extends StatefulWidget {
   final List<int> includeNumbers;
   final List<int> excludeNumbers;
-  final Function(List<int> inc, List<int> exc) onChanged;
-  final VoidCallback onGenerate;
+  final Function(List<int>, List<int>) onChanged;
 
   const CustomSettingsSheet({
     super.key,
     required this.includeNumbers,
     required this.excludeNumbers,
     required this.onChanged,
-    required this.onGenerate,
   });
 
   @override
@@ -108,7 +105,6 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
   @override
   Widget build(BuildContext context) {
     final isLight = AppColors.isLight;
-    final bottomPad = MediaQuery.of(context).padding.bottom;
     final hasFilter = _inc.isNotEmpty || _exc.isNotEmpty;
 
     return DraggableScrollableSheet(
@@ -249,35 +245,31 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
                   ),
                 ),
 
-                // ── 상태 카운터 배지 바 ─────────────────────────
+                // ── 상태 카운터 배지 바 (세로 2단 배치로 가독성 상향) ──
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                  child: Row(
+                  child: Column(
                     children: [
                       // 고정수 카운터
-                      Expanded(
-                        child: _buildCounterBadge(
-                          label: '고정수 (꼭 넣기)',
-                          count: _inc.count,
-                          maxCount: 5,
-                          primaryColor: const Color(0xFF1976D2),
-                          glowColor: const Color(0xFF42A5F5),
-                          icon: Icons.add_circle_rounded,
-                          isLight: isLight,
-                        ),
+                      _buildCounterBadge(
+                        label: '고정수 (꼭 넣기)',
+                        count: _inc.count,
+                        maxCount: 5,
+                        primaryColor: const Color(0xFF1976D2),
+                        glowColor: const Color(0xFF42A5F5),
+                        icon: Icons.add_circle_rounded,
+                        isLight: isLight,
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(height: 10),
                       // 제외수 카운터
-                      Expanded(
-                        child: _buildCounterBadge(
-                          label: '제외수 (빼기)',
-                          count: _exc.count,
-                          maxCount: 39,
-                          primaryColor: const Color(0xFFD32F2F),
-                          glowColor: const Color(0xFFEF5350),
-                          icon: Icons.remove_circle_rounded,
-                          isLight: isLight,
-                        ),
+                      _buildCounterBadge(
+                        label: '제외수 (빼기)',
+                        count: _exc.count,
+                        maxCount: 39,
+                        primaryColor: const Color(0xFFD32F2F),
+                        glowColor: const Color(0xFFEF5350),
+                        icon: Icons.remove_circle_rounded,
+                        isLight: isLight,
                       ),
                     ],
                   ),
@@ -410,25 +402,28 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
                     ),
 
                   // 메인 CTA 버튼 (번호 생성하기)
-                  Container(
-                    padding: EdgeInsets.fromLTRB(
-                        20, 10, 20, max(16.0, bottomPad + 12.0)),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: isLight
-                            ? [
-                                const Color(0xFFF8F3EA).withValues(alpha: 0.0),
-                                const Color(0xFFF8F3EA),
-                              ]
-                            : [
-                                const Color(0xFF10121C).withValues(alpha: 0.0),
-                                const Color(0xFF10121C),
-                              ],
+                  SafeArea(
+                    top: false,
+                    bottom: true,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: isLight
+                              ? [
+                                  const Color(0xFFF8F3EA).withValues(alpha: 0.0),
+                                  const Color(0xFFF8F3EA),
+                                ]
+                              : [
+                                  const Color(0xFF10121C).withValues(alpha: 0.0),
+                                  const Color(0xFF10121C),
+                                ],
+                        ),
                       ),
+                      child: _buildConfirmButton(isLight),
                     ),
-                    child: _buildGenerateButton(isLight, hasFilter),
                   ),
                 ],
               ),
@@ -452,7 +447,7 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
     final isFull = count >= maxCount;
     final displayColor = isFull ? glowColor : primaryColor;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: isLight
             ? displayColor.withValues(alpha: 0.07)
@@ -465,14 +460,14 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
       ),
       child: Row(
         children: [
-          Icon(icon, size: 15, color: displayColor),
-          const SizedBox(width: 6),
+          Icon(icon, size: 24, color: displayColor),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               label,
               style: GoogleFonts.notoSansKr(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+                fontSize: 15.5,
+                fontWeight: FontWeight.w700,
                 color: count > 0
                     ? (isLight ? displayColor : displayColor)
                     : AppColors.textSecondary,
@@ -481,10 +476,10 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
               maxLines: 1,
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 8),
           // 카운트 칩
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: count > 0
                   ? displayColor
@@ -494,9 +489,9 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              '$count/$maxCount',
+              '$count / $maxCount',
               style: GoogleFonts.rajdhani(
-                fontSize: 12,
+                fontSize: 16,
                 fontWeight: FontWeight.w800,
                 color: count > 0
                     ? Colors.white
@@ -586,12 +581,12 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
     );
   }
 
-  // ── 번호 생성 메인 CTA 버튼 ─────────────────────────────────────
-  Widget _buildGenerateButton(bool isLight, bool hasFilter) {
+  // ── 닫기 전용 하단 버튼 ─────────────────────────────────────
+  Widget _buildConfirmButton(bool isLight) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: widget.onGenerate,
+        onTap: () => Navigator.pop(context),
         borderRadius: BorderRadius.circular(18),
         child: Container(
           height: 58,
@@ -610,9 +605,8 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
             ),
             boxShadow: [
               BoxShadow(
-                color:
-                    (isLight ? const Color(0xFFC99700) : const Color(0xFFFFC837))
-                        .withValues(alpha: 0.4),
+                color: (isLight ? const Color(0xFFC99700) : const Color(0xFFFFC837))
+                    .withValues(alpha: 0.4),
                 blurRadius: 18,
                 offset: const Offset(0, 5),
               ),
@@ -621,14 +615,14 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.shuffle_rounded,
-                  size: 21, color: Color(0xFF140E00)),
+              const Icon(Icons.check_circle_outline_rounded,
+                  size: 22, color: Color(0xFF140E00)),
               const SizedBox(width: 8),
               Text(
-                hasFilter ? '필터 적용하고 번호 생성하기' : '번호 생성하기',
+                '선택 완료 및 닫기',
                 style: GoogleFonts.notoSansKr(
                   fontWeight: FontWeight.w800,
-                  fontSize: 15.5,
+                  fontSize: 16.5,
                   color: const Color(0xFF140E00),
                   letterSpacing: 0.3,
                 ),
