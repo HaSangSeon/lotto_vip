@@ -14,7 +14,7 @@ void main() {
       final entry = LottoHistoryEntry.fromJson(oldJson);
       expect(entry.isTicket, isFalse);
       expect(entry.gameCount, equals(1));
-      expect(entry.entryType, equals(LottoEntryType.vipLucky));
+      expect(entry.entryType, equals(LottoEntryType.birthDate));
       expect(entry.numbers, equals([3, 11, 15, 22, 35, 44]));
       expect(entry.games, isNull);
       expect(entry.isFavorite, isTrue);

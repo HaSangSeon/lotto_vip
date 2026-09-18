@@ -486,7 +486,7 @@ class PrizeSectionView extends StatelessWidget {
       useSafeArea: true,
       builder: (ctx) => Container(
         margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + MediaQuery.of(context).padding.bottom),
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.85,
         ),
@@ -962,7 +962,7 @@ class PrizeSectionView extends StatelessWidget {
                             // 판매점 리스트
                             Expanded(
                               child: ListView.separated(
-                                padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                                padding: EdgeInsets.fromLTRB(16, 4, 16, 20 + MediaQuery.of(context).padding.bottom),
                                 itemCount: filteredStores.length,
                                 separatorBuilder: (_, _) => const SizedBox(height: 10),
                                 itemBuilder: (context, idx) {

@@ -282,7 +282,7 @@ class _HistoryTabState extends State<HistoryTab> {
         case HistoryFilter.qrScanned:
           return entry.entryType == LottoEntryType.qrScan;
         case HistoryFilter.generated:
-          return entry.entryType == LottoEntryType.vipLucky || entry.entryType == LottoEntryType.custom;
+          return entry.entryType != LottoEntryType.qrScan;
         case HistoryFilter.winnersOnly:
           final compareResult = _getResultForEntry(entry);
           if (entry.isTicket && entry.games != null) {
@@ -512,18 +512,25 @@ class _HistoryTabState extends State<HistoryTab> {
         label = '🎫 실물복권';
         break;
 
-      case LottoEntryType.vipLucky:
-        bg = isLight ? const Color(0xFFFFF9E6) : const Color(0xFFFFD700).withValues(alpha: 0.18);
-        border = isLight ? const Color(0xFFD4AF37) : const Color(0xFFFFD700).withValues(alpha: 0.6);
-        textColor = isLight ? const Color(0xFF855A00) : const Color(0xFFFFD700);
-        label = '👑 VIP행운';
+      case LottoEntryType.dream:
+        bg = isLight ? const Color(0xFFF3E5F5) : const Color(0xFFAB47BC).withValues(alpha: 0.18);
+        border = isLight ? const Color(0xFFAB47BC) : const Color(0xFFAB47BC).withValues(alpha: 0.6);
+        textColor = isLight ? const Color(0xFF6A1B9A) : const Color(0xFFCE93D8);
+        label = '🌙 꿈해몽';
         break;
 
-      case LottoEntryType.custom:
-        bg = isLight ? const Color(0xFFF4ECF7) : const Color(0xFF9B59B6).withValues(alpha: 0.18);
-        border = isLight ? const Color(0xFF9B59B6) : const Color(0xFF9B59B6).withValues(alpha: 0.6);
-        textColor = isLight ? const Color(0xFF512E5F) : const Color(0xFFD7BDE2);
-        label = '⚙️ 맞춤조합';
+      case LottoEntryType.birthDate:
+        bg = isLight ? const Color(0xFFFFF8E1) : const Color(0xFFFFB300).withValues(alpha: 0.18);
+        border = isLight ? const Color(0xFFFFB300) : const Color(0xFFFFB300).withValues(alpha: 0.6);
+        textColor = isLight ? const Color(0xFFB76E00) : const Color(0xFFFFE082);
+        label = '🎂 생년월일';
+        break;
+
+      case LottoEntryType.customFilter:
+        bg = isLight ? const Color(0xFFE0F7FA) : const Color(0xFF00ACC1).withValues(alpha: 0.18);
+        border = isLight ? const Color(0xFF00ACC1) : const Color(0xFF00ACC1).withValues(alpha: 0.6);
+        textColor = isLight ? const Color(0xFF006064) : const Color(0xFF80DEEA);
+        label = '⚙️ 맞춤필터';
         break;
     }
 
@@ -1227,7 +1234,7 @@ class _HistoryTabState extends State<HistoryTab> {
 
           const SizedBox(height: 8),
 
-          // 2. [하단 탭] 4개 세그먼트 (전체 | 🎫 실물복권 | ✨ 생성번호 | 🏆 당첨)
+          // 2. [하단 탭] 4개 세그먼트 (전체 | 🎫 실물복권 | ✨ 프리미엄 추출 | 🏆 당첨)
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
@@ -1241,7 +1248,7 @@ class _HistoryTabState extends State<HistoryTab> {
               children: [
                 _buildSegmentButton('전체', HistoryFilter.all),
                 _buildSegmentButton('🎫 실물복권', HistoryFilter.qrScanned),
-                _buildSegmentButton('✨ 생성번호', HistoryFilter.generated),
+                _buildSegmentButton('✨ 프리미엄 추출', HistoryFilter.generated),
                 _buildSegmentButton('🏆 당첨', HistoryFilter.winnersOnly),
               ],
             ),
@@ -1261,7 +1268,7 @@ class _HistoryTabState extends State<HistoryTab> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
           decoration: BoxDecoration(
             color: isSelected
                 ? (isLight ? Colors.white : AppColors.gold.withValues(alpha: 0.22))
@@ -1283,14 +1290,18 @@ class _HistoryTabState extends State<HistoryTab> {
                   ]
                 : null,
           ),
-          child: Text(
-            label,
-            style: GoogleFonts.notoSansKr(
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-              color: isSelected
-                  ? (isLight ? AppColors.goldDeep : AppColors.gold)
-                  : AppColors.textSecondary,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: GoogleFonts.notoSansKr(
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                color: isSelected
+                    ? (isLight ? AppColors.goldDeep : AppColors.gold)
+                    : AppColors.textSecondary,
+              ),
             ),
           ),
         ),
@@ -1386,7 +1397,7 @@ class _HistoryTabState extends State<HistoryTab> {
           ),
           const SizedBox(height: 6),
           Text(
-            '행운 번호 생성이나 종이복권 QR 스캔으로\n번호를 보관해 보세요.',
+            '프리미엄 번호 추출이나 종이복권 QR 스캔으로\n번호를 보관해 보세요.',
             textAlign: TextAlign.center,
             style: GoogleFonts.notoSansKr(
               color: AppColors.textHint,

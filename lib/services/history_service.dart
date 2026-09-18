@@ -2,8 +2,9 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum LottoEntryType {
-  vipLucky, // 오늘의 VIP 행운 번호
-  custom, // 맞춤 번호 조합
+  dream, // 꿈해몽
+  birthDate, // 생년월일
+  customFilter, // 맞춤필터
   qrScan, // 실제 구매 복권 (QR 스캔)
 }
 
@@ -52,21 +53,25 @@ class LottoHistoryEntry {
   LottoEntryType get entryType {
     if (title.contains('QR') || title.contains('스캔') || isTicket) {
       return LottoEntryType.qrScan;
-    } else if (title.contains('VIP') || title.contains('행운')) {
-      return LottoEntryType.vipLucky;
+    } else if (title.contains('꿈') || title.contains('해몽')) {
+      return LottoEntryType.dream;
+    } else if (title.contains('생년월일') || title.contains('VIP') || title.contains('행운')) {
+      return LottoEntryType.birthDate;
     } else {
-      return LottoEntryType.custom;
+      return LottoEntryType.customFilter;
     }
   }
 
   String get typeBadgeLabel {
     switch (entryType) {
       case LottoEntryType.qrScan:
-        return isTicket ? '🎫 실물 복권 ($gameCount게임)' : '🎫 실물 복권';
-      case LottoEntryType.vipLucky:
-        return '👑 VIP 행운';
-      case LottoEntryType.custom:
-        return '⚙️ 맞춤 조합';
+        return isTicket ? '🎫 실물복권 ($gameCount게임)' : '🎫 실물복권';
+      case LottoEntryType.dream:
+        return '🌙 꿈해몽';
+      case LottoEntryType.birthDate:
+        return '🎂 생년월일';
+      case LottoEntryType.customFilter:
+        return '⚙️ 맞춤필터';
     }
   }
 

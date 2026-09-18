@@ -108,7 +108,7 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
     final hasFilter = _inc.isNotEmpty || _exc.isNotEmpty;
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.88,
+      initialChildSize: 0.92,
       minChildSize: 0.5,
       maxChildSize: 0.96,
       builder: (_, controller) => Container(
@@ -135,180 +135,257 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
             ),
           ],
         ),
-        child: Stack(
+        child: Column(
           children: [
-            Column(
-              children: [
-                // ── 드래그 핸들 ──────────────────────────────
-                Container(
-                  margin: const EdgeInsets.only(top: 12),
-                  width: 44,
-                  height: 4.5,
-                  decoration: BoxDecoration(
-                    color: isLight
-                        ? const Color(0xFFD4C8B4)
-                        : Colors.white.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
+            // ── 드래그 핸들 ──────────────────────────────
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 44,
+              height: 4.5,
+              decoration: BoxDecoration(
+                color: isLight
+                    ? const Color(0xFFD4C8B4)
+                    : Colors.white.withValues(alpha: 0.22),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
 
-                // ── 헤더: 타이틀 + 카운터 배지 + 초기화 ─────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 16, 10),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
+            // ── 헤더: 타이틀 + 카운터 배지 + 초기화 ─────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 16, 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isLight
+                          ? const Color(0xFFFFF0C2)
+                          : AppColors.gold.withValues(alpha: 0.15),
+                      border: Border.all(
+                        color: isLight
+                            ? AppColors.lightGoldBorder.withValues(alpha: 0.6)
+                            : AppColors.gold.withValues(alpha: 0.5),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.tune_rounded,
+                      size: 19,
+                      color: AppColors.goldText,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '고정수 / 제외수 필터 설정',
+                          style: GoogleFonts.notoSansKr(
+                            color: AppColors.textPrimary,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          '번호를 터치해 고정수·제외수를 설정하세요',
+                          style: GoogleFonts.notoSansKr(
+                            color: AppColors.textSecondary,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // 초기화 버튼
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: hasFilter ? _resetAll : null,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isLight
-                              ? const Color(0xFFFFF0C2)
-                              : AppColors.gold.withValues(alpha: 0.15),
+                          color: hasFilter
+                              ? (isLight
+                                  ? const Color(0xFFFAF0E0)
+                                  : Colors.white.withValues(alpha: 0.07))
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: isLight
-                                ? AppColors.lightGoldBorder.withValues(alpha: 0.6)
-                                : AppColors.gold.withValues(alpha: 0.5),
-                            width: 1.2,
+                            color: hasFilter
+                                ? (isLight
+                                    ? AppColors.lightGoldBorder
+                                        .withValues(alpha: 0.5)
+                                    : AppColors.borderSubtle)
+                                : Colors.transparent,
                           ),
                         ),
-                        child: Icon(
-                          Icons.tune_rounded,
-                          size: 19,
-                          color: AppColors.goldText,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '고정수 / 제외수 필터 설정',
-                              style: GoogleFonts.notoSansKr(
-                                color: AppColors.textPrimary,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-                            const SizedBox(height: 1),
-                            Text(
-                              '번호를 터치해 고정수·제외수를 설정하세요',
-                              style: GoogleFonts.notoSansKr(
-                                color: AppColors.textSecondary,
-                                fontSize: 11.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // 초기화 버튼
-                      Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: hasFilter ? _resetAll : null,
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: hasFilter
-                                  ? (isLight
-                                      ? const Color(0xFFFAF0E0)
-                                      : Colors.white.withValues(alpha: 0.07))
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: hasFilter
-                                    ? (isLight
-                                        ? AppColors.lightGoldBorder
-                                            .withValues(alpha: 0.5)
-                                        : AppColors.borderSubtle)
-                                    : Colors.transparent,
-                              ),
-                            ),
-                            child: Text(
-                              '초기화',
-                              style: GoogleFonts.notoSansKr(
-                                color: hasFilter
-                                    ? AppColors.goldText
-                                    : AppColors.textHint,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
+                        child: Text(
+                          '초기화',
+                          style: GoogleFonts.notoSansKr(
+                            color: hasFilter
+                                ? AppColors.goldText
+                                : AppColors.textHint,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
+              ),
+            ),
 
-                // ── 상태 카운터 배지 바 (세로 2단 배치로 가독성 상향) ──
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                  child: Column(
-                    children: [
-                      // 고정수 카운터
-                      _buildCounterBadge(
-                        label: '고정수 (꼭 넣기)',
-                        count: _inc.count,
-                        maxCount: 5,
-                        primaryColor: const Color(0xFF1976D2),
-                        glowColor: const Color(0xFF42A5F5),
-                        icon: Icons.add_circle_rounded,
-                        isLight: isLight,
-                      ),
-                      const SizedBox(height: 10),
-                      // 제외수 카운터
-                      _buildCounterBadge(
-                        label: '제외수 (빼기)',
-                        count: _exc.count,
-                        maxCount: 39,
-                        primaryColor: const Color(0xFFD32F2F),
-                        glowColor: const Color(0xFFEF5350),
-                        icon: Icons.remove_circle_rounded,
-                        isLight: isLight,
-                      ),
-                    ],
+            // ── 상태 카운터 배지 바 (가로 1단 배치로 대화면 공간 확보) ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Row(
+                children: [
+                  // 고정수 카운터
+                  Expanded(
+                    child: _buildCounterBadge(
+                      label: '고정수',
+                      subLabel: '꼭 넣기',
+                      count: _inc.count,
+                      maxCount: 5,
+                      primaryColor: const Color(0xFF1976D2),
+                      glowColor: const Color(0xFF42A5F5),
+                      icon: Icons.add_circle_rounded,
+                      isLight: isLight,
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 10),
+                  // 제외수 카운터
+                  Expanded(
+                    child: _buildCounterBadge(
+                      label: '제외수',
+                      subLabel: '빼기',
+                      count: _exc.count,
+                      maxCount: 39,
+                      primaryColor: const Color(0xFFD32F2F),
+                      glowColor: const Color(0xFFEF5350),
+                      icon: Icons.remove_circle_rounded,
+                      isLight: isLight,
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-                // ── 조작 안내 칩 ────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+            // ── 조작 안내 칩 ────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
+                decoration: BoxDecoration(
+                  color: isLight
+                      ? Colors.blue.withValues(alpha: 0.05)
+                      : Colors.blue.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: Colors.blue.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.info_outline_rounded,
+                        size: 13,
+                        color: isLight
+                            ? Colors.blue.shade700
+                            : Colors.blue.shade300),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        '터치할 때마다: 기본 → 고정수(파랑) → 제외수(빨강) 순 변경',
+                        style: GoogleFonts.notoSansKr(
+                          color: isLight
+                              ? Colors.blue.shade700
+                              : Colors.blue.shade200,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── 번호 그리드 (1 ~ 45) ────────────────────────
+            Expanded(
+              child: GridView.builder(
+                controller: controller,
+                padding: const EdgeInsets.fromLTRB(18, 2, 18, 10),
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 7,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 1.0,
+                ),
+                itemCount: 45,
+                itemBuilder: (context, idx) {
+                  final num = idx + 1;
+                  final isInc = _inc.contains(num);
+                  final isExc = _exc.contains(num);
+                  return _buildNumberCell(
+                      num, isInc, isExc, isLight);
+                },
+              ),
+            ),
+
+            // ── 경고 토스트 ──────────────────────────────────
+            if (_warningMessage != null)
+              FadeTransition(
+                opacity: _warningFadeAnim,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
                   child: Container(
-                    width: double.infinity,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 11),
                     decoration: BoxDecoration(
                       color: isLight
-                          ? Colors.blue.withValues(alpha: 0.05)
-                          : Colors.blue.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
+                          ? const Color(0xFFFBE9E7)
+                          : const Color(0xFF3A1010),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                          color: Colors.blue.withValues(alpha: 0.2)),
+                        color: const Color(0xFFEF5350)
+                            .withValues(alpha: 0.55),
+                        width: 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFD32F2F)
+                              .withValues(alpha: 0.2),
+                          blurRadius: 14,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.info_outline_rounded,
-                            size: 14,
-                            color: isLight
-                                ? Colors.blue.shade700
-                                : Colors.blue.shade300),
-                        const SizedBox(width: 6),
-                        Flexible(
+                        const Icon(Icons.warning_rounded,
+                            color: Color(0xFFEF5350), size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(
                           child: Text(
-                            '터치할 때마다: 기본 → 고정수(파랑) → 제외수(빨강) 순으로 변경됩니다',
+                            _warningMessage!,
                             style: GoogleFonts.notoSansKr(
                               color: isLight
-                                  ? Colors.blue.shade700
-                                  : Colors.blue.shade200,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              height: 1.3,
+                                  ? const Color(0xFFB71C1C)
+                                  : const Color(0xFFFFCDD2),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
@@ -316,116 +393,28 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
                     ),
                   ),
                 ),
+              ),
 
-                // ── 번호 그리드 (1 ~ 45) ────────────────────────
-                Expanded(
-                  child: GridView.builder(
-                    controller: controller,
-                    padding: const EdgeInsets.fromLTRB(18, 4, 18, 100),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 7,
-                      mainAxisSpacing: 10,
-                      crossAxisSpacing: 8,
-                      childAspectRatio: 1.0,
+            // ── 하단 액션 버튼 (닫기 전용) ─────────────────────
+            SafeArea(
+              top: false,
+              bottom: true,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
+                decoration: BoxDecoration(
+                  color: isLight
+                      ? const Color(0xFFF8F3EA)
+                      : const Color(0xFF10121C),
+                  border: Border(
+                    top: BorderSide(
+                      color: isLight
+                          ? AppColors.lightGoldBorder.withValues(alpha: 0.5)
+                          : AppColors.borderGold.withValues(alpha: 0.25),
+                      width: 1.0,
                     ),
-                    itemCount: 45,
-                    itemBuilder: (context, idx) {
-                      final num = idx + 1;
-                      final isInc = _inc.contains(num);
-                      final isExc = _exc.contains(num);
-                      return _buildNumberCell(
-                          num, isInc, isExc, isLight);
-                    },
                   ),
                 ),
-              ],
-            ),
-
-            // ── 하단 액션 버튼 + 경고 토스트 영역 ────────────────
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 경고 토스트
-                  if (_warningMessage != null)
-                    FadeTransition(
-                      opacity: _warningFadeAnim,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 11),
-                          decoration: BoxDecoration(
-                            color: isLight
-                                ? const Color(0xFFFBE9E7)
-                                : const Color(0xFF3A1010),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: const Color(0xFFEF5350)
-                                  .withValues(alpha: 0.55),
-                              width: 1.2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFD32F2F)
-                                    .withValues(alpha: 0.2),
-                                blurRadius: 14,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.warning_rounded,
-                                  color: Color(0xFFEF5350), size: 18),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  _warningMessage!,
-                                  style: GoogleFonts.notoSansKr(
-                                    color: isLight
-                                        ? const Color(0xFFB71C1C)
-                                        : const Color(0xFFFFCDD2),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                  // 메인 CTA 버튼 (번호 생성하기)
-                  SafeArea(
-                    top: false,
-                    bottom: true,
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: isLight
-                              ? [
-                                  const Color(0xFFF8F3EA).withValues(alpha: 0.0),
-                                  const Color(0xFFF8F3EA),
-                                ]
-                              : [
-                                  const Color(0xFF10121C).withValues(alpha: 0.0),
-                                  const Color(0xFF10121C),
-                                ],
-                        ),
-                      ),
-                      child: _buildConfirmButton(isLight),
-                    ),
-                  ),
-                ],
+                child: _buildConfirmButton(isLight),
               ),
             ),
           ],
@@ -437,6 +426,7 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
   // ── 카운터 배지 위젯 ────────────────────────────────────────────
   Widget _buildCounterBadge({
     required String label,
+    String? subLabel,
     required int count,
     required int maxCount,
     required Color primaryColor,
@@ -447,12 +437,12 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
     final isFull = count >= maxCount;
     final displayColor = isFull ? glowColor : primaryColor;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: isLight
             ? displayColor.withValues(alpha: 0.07)
             : displayColor.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: displayColor.withValues(alpha: count > 0 ? 0.45 : 0.2),
           width: count > 0 ? 1.3 : 1.0,
@@ -460,38 +450,53 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
       ),
       child: Row(
         children: [
-          Icon(icon, size: 24, color: displayColor),
-          const SizedBox(width: 12),
+          Icon(icon, size: 20, color: displayColor),
+          const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              label,
-              style: GoogleFonts.notoSansKr(
-                fontSize: 15.5,
-                fontWeight: FontWeight.w700,
-                color: count > 0
-                    ? (isLight ? displayColor : displayColor)
-                    : AppColors.textSecondary,
-              ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: count > 0 ? displayColor : AppColors.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+                if (subLabel != null)
+                  Text(
+                    subLabel,
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textHint,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+              ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           // 카운트 칩
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
             decoration: BoxDecoration(
               color: count > 0
                   ? displayColor
                   : (isLight
                       ? Colors.black.withValues(alpha: 0.07)
                       : Colors.white.withValues(alpha: 0.08)),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(7),
             ),
             child: Text(
               '$count / $maxCount',
               style: GoogleFonts.rajdhani(
-                fontSize: 16,
+                fontSize: 13.5,
                 fontWeight: FontWeight.w800,
                 color: count > 0
                     ? Colors.white

@@ -35,7 +35,26 @@ class _StatisticsTabState extends State<StatisticsTab> {
     {'number': 32, 'count': 149},
   ];
 
-  Widget _buildStatSection(String title, String subtitle, List<Map<String, dynamic>> data, IconData icon, Color iconColor) {
+  final List<Map<String, dynamic>> _overdueNumbers = [
+    {'number': 2, 'weeks': 15},
+    {'number': 16, 'weeks': 12},
+    {'number': 25, 'weeks': 11},
+    {'number': 31, 'weeks': 11},
+    {'number': 4, 'weeks': 9},
+    {'number': 11, 'weeks': 8},
+    {'number': 38, 'weeks': 8},
+  ];
+
+  Widget _buildStatSection(
+    String title,
+    String subtitle,
+    List<Map<String, dynamic>> data,
+    IconData icon,
+    Color iconColor, {
+    String countKey = 'count',
+    String unit = '회',
+    Color? countColor,
+  }) {
     return GlassCard(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -52,25 +71,29 @@ class _StatisticsTabState extends State<StatisticsTab> {
                 child: Icon(icon, color: iconColor, size: 20),
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.notoSansKr(
-                      color: AppColors.textPrimary,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.notoSansKr(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.notoSansKr(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.notoSansKr(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -79,6 +102,7 @@ class _StatisticsTabState extends State<StatisticsTab> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: data.map((item) {
+                final value = item[countKey];
                 return Padding(
                   padding: const EdgeInsets.only(right: 12),
                   child: Column(
@@ -86,9 +110,9 @@ class _StatisticsTabState extends State<StatisticsTab> {
                       LottoBall(number: item['number'] as int, size: 44),
                       const SizedBox(height: 8),
                       Text(
-                        '${item['count']}회',
+                        '$value$unit',
                         style: GoogleFonts.rajdhani(
-                          color: AppColors.textSecondary,
+                          color: countColor ?? AppColors.textSecondary,
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
@@ -146,6 +170,18 @@ class _StatisticsTabState extends State<StatisticsTab> {
             Icons.ac_unit,
             Colors.blueAccent,
           ).animate().fadeIn(duration: 400.ms, delay: 100.ms).slideY(begin: 0.2, end: 0, duration: 400.ms),
+
+          const SizedBox(height: 20),
+          
+          _buildStatSection(
+            '나올 때가 된 장기 미출현 번호',
+            '최근 가장 오랫동안 당첨되지 않은 번호들',
+            _overdueNumbers,
+            Icons.hourglass_empty_rounded,
+            Colors.orangeAccent,
+            countKey: 'weeks',
+            unit: '주째',
+          ).animate().fadeIn(duration: 400.ms, delay: 150.ms).slideY(begin: 0.2, end: 0, duration: 400.ms),
 
           const SizedBox(height: 20),
 

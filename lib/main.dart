@@ -436,7 +436,7 @@ class _HomeScreenState extends State<HomeScreen>
     if (!isAlreadySaved) {
       final upcomingDrawNo = HistoryService.calculateTargetDrawNo(DateTime.now());
       final entry = LottoHistoryEntry(
-        title: '제$upcomingDrawNo회 VIP 행운 번호',
+        title: '제$upcomingDrawNo회 생년월일 행운 번호',
         numbers: result,
         createdAt: DateTime.now(),
       );
@@ -445,7 +445,7 @@ class _HomeScreenState extends State<HomeScreen>
       await _loadHistory();
     }
 
-    _showResultSheet('👑 VIP 행운 번호', result, true);
+    _showResultSheet('🎂 생년월일 행운 번호', result, true);
   }
 
   Future<void> _generateCustomNumbers() async {
@@ -480,14 +480,14 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() => _customNumbers = result);
     final upcomingDrawNo = HistoryService.calculateTargetDrawNo(DateTime.now());
     final entry = LottoHistoryEntry(
-      title: '제$upcomingDrawNo회 맞춤 번호 조합',
+      title: '제$upcomingDrawNo회 맞춤필터 번호',
       numbers: result,
       createdAt: DateTime.now(),
     );
     await HistoryService.save(entry);
     await NotificationService.scheduleWeeklyDrawNotification();
     await _loadHistory();
-    _showResultSheet('⚙️ 커스텀 맞춤 번호', result, false);
+    _showResultSheet('⚙️ 맞춤필터 추천 번호', result, false);
   }
 
   void _showToast(String msg) {
