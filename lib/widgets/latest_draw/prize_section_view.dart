@@ -525,6 +525,7 @@ class PrizeSectionView extends StatelessWidget {
 
               // 헤더 타이틀
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -535,25 +536,34 @@ class PrizeSectionView extends StatelessWidget {
                     child: const Icon(Icons.emoji_events_rounded, color: AppColors.gold, size: 22),
                   ),
                   const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '제 ${result.drwNo}회 당첨 상세 분석',
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '제 ${result.drwNo}회 당첨 상세 분석',
+                          style: GoogleFonts.notoSansKr(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
-                      ),
-                      Text(
-                        '추첨일: ${result.drwNoDate}',
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
+                        Text(
+                          '추첨일: ${result.drwNoDate}',
+                          style: GoogleFonts.notoSansKr(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(Icons.close, size: 24),
+                    color: AppColors.textSecondary,
+                    onPressed: () => Navigator.of(ctx).pop(),
                   ),
                 ],
               ),
@@ -718,24 +728,8 @@ class PrizeSectionView extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 20),
-
-              // 확인 닫기 버튼
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.isLight ? AppColors.goldDark : AppColors.gold,
-                    foregroundColor: AppColors.isLight ? Colors.white : Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  child: Text('확인', style: GoogleFonts.notoSansKr(fontWeight: FontWeight.bold, fontSize: 15)),
-                ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ),
       ),
     );

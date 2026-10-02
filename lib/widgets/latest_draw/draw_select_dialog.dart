@@ -102,8 +102,9 @@ class _DrawSelectDialogState extends State<DrawSelectDialog> {
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
@@ -306,6 +307,7 @@ class _DrawSelectDialogState extends State<DrawSelectDialog> {
               ],
             ),
           ],
+        ),
         ),
       ),
     ));

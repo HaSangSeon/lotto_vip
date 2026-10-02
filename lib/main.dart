@@ -9,6 +9,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:kakao_flutter_sdk_share/kakao_flutter_sdk_share.dart';
 
 import 'theme/app_theme.dart';
 import 'services/history_service.dart';
@@ -43,6 +44,7 @@ void main() async {
   };
 
   try {
+    KakaoSdk.init(nativeAppKey: '4fbc1168c5aab0bfff20dfefc86a1bb2');
     await initializeDateFormatting('ko_KR', null);
     await AppTheme.init();
     await NotificationService.init();

@@ -111,8 +111,9 @@ class _NotificationSettingsDialogState
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // 상단 헤더
@@ -390,6 +391,7 @@ class _NotificationSettingsDialogState
               ),
             ),
           ],
+        ),
         ),
       ),
     );

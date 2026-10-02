@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
@@ -396,12 +397,14 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
               ),
 
             // ── 하단 액션 버튼 (닫기 전용) ─────────────────────
-            SafeArea(
-              top: false,
-              bottom: true,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
-                decoration: BoxDecoration(
+            Container(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                10,
+                20,
+                max(14.0, MediaQuery.of(context).padding.bottom + 14.0),
+              ),
+              decoration: BoxDecoration(
                   color: isLight
                       ? const Color(0xFFF8F3EA)
                       : const Color(0xFF10121C),
@@ -416,7 +419,6 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
                 ),
                 child: _buildConfirmButton(isLight),
               ),
-            ),
           ],
         ),
       ),
