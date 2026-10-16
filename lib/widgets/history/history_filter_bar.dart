@@ -125,7 +125,7 @@ class HistoryFilterBar extends StatelessWidget {
 
           const SizedBox(height: 8),
 
-          // 2. [하단 탭] 4개 세그먼트 (전체 | 실물복권 | 프리미엄 추출 | 당첨)
+          // 2. [하단 탭] 4개 세그먼트 (전체 | 실물복권 | 추출번호 | 당첨)
           Container(
             padding: const EdgeInsets.all(3.5),
             decoration: BoxDecoration(
@@ -156,7 +156,7 @@ class HistoryFilterBar extends StatelessWidget {
                 ),
                 _buildSegmentItem(
                   filter: HistoryFilter.generated,
-                  label: '프리미엄 추출',
+                  label: '추출번호',
                   icon: Icons.auto_awesome_rounded,
                   isLight: isLight,
                 ),

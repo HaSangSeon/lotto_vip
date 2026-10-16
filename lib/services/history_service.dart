@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum LottoEntryType {
+  shake, // 흔들어 뽑기
   dream, // 꿈해몽
   birthDate, // 생년월일
   customFilter, // 맞춤필터
@@ -53,6 +54,8 @@ class LottoHistoryEntry {
   LottoEntryType get entryType {
     if (title.contains('QR') || title.contains('스캔') || isTicket) {
       return LottoEntryType.qrScan;
+    } else if (title.contains('흔들')) {
+      return LottoEntryType.shake;
     } else if (title.contains('꿈') || title.contains('해몽')) {
       return LottoEntryType.dream;
     } else if (title.contains('생년월일') || title.contains('VIP') || title.contains('행운')) {
@@ -66,6 +69,8 @@ class LottoHistoryEntry {
     switch (entryType) {
       case LottoEntryType.qrScan:
         return isTicket ? '🎫 실물복권 ($gameCount게임)' : '🎫 실물복권';
+      case LottoEntryType.shake:
+        return '🎲 흔들어 뽑기';
       case LottoEntryType.dream:
         return '🌙 꿈해몽';
       case LottoEntryType.birthDate:

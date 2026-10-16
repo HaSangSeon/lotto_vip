@@ -361,10 +361,10 @@ class _HomeScreenState extends State<HomeScreen>
       return;
     }
 
-    // 2) 최소 90초(1분 30초) 쿨타임 검사 (최근 광고 시청 후 일정 시간 방어)
+    // 2) 최소 3분(180초) 쿨타임 검사 (최근 광고 시청 후 일정 시간 방어)
     if (_lastInterstitialAdShownTime != null) {
       final elapsed = DateTime.now().difference(_lastInterstitialAdShownTime!);
-      if (elapsed < const Duration(seconds: 90)) {
+      if (elapsed < const Duration(minutes: 3)) {
         onComplete();
         return;
       }
@@ -411,6 +411,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _generateVipNumbers() async {
+    FocusScope.of(context).unfocus();
     if (_birthDateCtrl.text.length < 6) {
       _showToast('생년월일 6자리를 입력해주세요.');
       return;
@@ -418,7 +419,7 @@ class _HomeScreenState extends State<HomeScreen>
     _saveBirthDate(_birthDateCtrl.text);
 
     await _showCalculationLoading(
-      title: '👑 행운 번호 정밀 분석',
+      title: '🎂 생년월일 행운 번호 분석',
       step1: '생년월일과 오늘의 기운 데이터 분석 중...',
       step2: '최적의 6개 행운 번호 조합 도출 중...',
     );
@@ -521,6 +522,12 @@ class _HomeScreenState extends State<HomeScreen>
       // 번호 결과를 먼저 확인한 후, 결과 창을 닫았을 때 전면 광고 노출
       _showInterstitialAd(() {});
     });
+  }
+
+  void _showDreamResult(String title, List<int> numbers) {
+    _generationCount++;
+    _loadHistory();
+    _showResultSheet(title, numbers, true);
   }
 
   void _openCustomDialog() {
@@ -639,6 +646,7 @@ class _HomeScreenState extends State<HomeScreen>
           excludeNumbers: _excludeNumbers,
           onOpenCustomDialog: _openCustomDialog,
           onGenerateCustom: _generateCustomNumbers,
+          onShowDreamResult: _showDreamResult,
         );
       case 2:
         return StatisticsTab(

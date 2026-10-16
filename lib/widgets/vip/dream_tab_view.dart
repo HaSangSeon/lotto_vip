@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -9,9 +10,15 @@ import '../../services/history_service.dart';
 import '../../services/notification_service.dart';
 import '../common_widgets.dart';
 import '../result_sheet.dart';
+import '../dialogs/calculation_loading_dialog.dart';
 
 class DreamTabView extends StatefulWidget {
-  const DreamTabView({super.key});
+  final void Function(String title, List<int> numbers)? onShowResult;
+
+  const DreamTabView({
+    super.key,
+    this.onShowResult,
+  });
 
   @override
   State<DreamTabView> createState() => _DreamTabViewState();
@@ -22,7 +29,6 @@ class _DreamTabViewState extends State<DreamTabView> {
   List<String> _searchResults = DreamDictionary.popularKeywords;
   
   final List<String> _selectedDreams = [];
-  bool _isGenerating = false;
   
   // 현재 선택된 꿈들로 만들 수 있는 고정수 계산
   Set<int> get _currentFixedNumbers {
@@ -67,13 +73,20 @@ class _DreamTabViewState extends State<DreamTabView> {
 
   void _generateDreamNumbers() async {
     if (_selectedDreams.isEmpty) return;
-    
-    setState(() {
-      _isGenerating = true;
-    });
+    FocusScope.of(context).unfocus();
 
-    // 몽환적인 연출을 위해 약간의 딜레이
-    await Future.delayed(const Duration(milliseconds: 1500));
+    // 맞춤필터와 동일한 로딩 팝업 다이얼로그 표시
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const CalculationLoadingDialog(
+        title: '🌙 꿈해몽 알고리즘 연산',
+        step1: '선택된 꿈 키워드 고정수 분석 중...',
+        step2: '신비로운 역대 로또 최적 조합 도출 중...',
+      ),
+    );
+
+    if (!mounted) return;
 
     final random = Random();
     final Set<int> resultSet = Set<int>.from(_currentFixedNumbers);
@@ -84,11 +97,9 @@ class _DreamTabViewState extends State<DreamTabView> {
     
     final finalNumbers = resultSet.toList()..sort();
 
-    if (mounted) {
-      setState(() {
-        _isGenerating = false;
-      });
-
+    if (widget.onShowResult != null) {
+      widget.onShowResult!('🌙 꿈해몽 행운 번호', finalNumbers);
+    } else {
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -102,7 +113,7 @@ class _DreamTabViewState extends State<DreamTabView> {
       );
     }
 
-    // 보관함(히스토리)에 자동 저장 로직 추가
+    // 보관함(히스토리)에 자동 저장 로직
     final upcomingDrawNo = HistoryService.calculateTargetDrawNo(DateTime.now());
     final dreamNames = _selectedDreams.join(', ');
     final entry = LottoHistoryEntry(
@@ -117,36 +128,58 @@ class _DreamTabViewState extends State<DreamTabView> {
   Widget _buildKeywordChip(String keyword, bool isSelected) {
     final isLight = AppColors.isLight;
     return InkWell(
-      onTap: () => _onDreamSelected(keyword),
+      onTap: () {
+        HapticFeedback.selectionClick();
+        _onDreamSelected(keyword);
+      },
       borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected 
-              ? (isLight ? AppColors.goldDark : AppColors.gold)
-              : (isLight ? Colors.white : Colors.black.withValues(alpha: 0.3)),
+          gradient: isSelected
+              ? (isLight
+                  ? const LinearGradient(
+                      colors: [Color(0xFFB8860B), Color(0xFF92690A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : LinearGradient(
+                      colors: [AppColors.gold, AppColors.goldDark],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ))
+              : null,
+          color: isSelected
+              ? null
+              : (isLight ? Colors.white : Colors.white.withValues(alpha: 0.05)),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected 
-                ? Colors.transparent 
-                : (isLight ? AppColors.lightGoldBorder : AppColors.borderGold),
+            color: isSelected
+                ? Colors.transparent
+                : (isLight
+                    ? const Color(0xFFE2D6C3)
+                    : Colors.white.withValues(alpha: 0.1)),
+            width: 1.0,
           ),
-          boxShadow: isSelected ? [
-            BoxShadow(
-              color: (isLight ? AppColors.goldDark : AppColors.gold).withValues(alpha: 0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            )
-          ] : null,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: (isLight ? AppColors.goldDark : AppColors.gold).withValues(alpha: 0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  )
+                ]
+              : null,
         ),
         child: Text(
           '#$keyword',
           style: GoogleFonts.notoSansKr(
-            color: isSelected 
-                ? (isLight ? Colors.white : Colors.black)
+            color: isSelected
+                ? Colors.white
                 : AppColors.textPrimary,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            fontSize: 13.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            fontSize: 13,
           ),
         ),
       ),
@@ -198,13 +231,19 @@ class _DreamTabViewState extends State<DreamTabView> {
                 const SizedBox(height: 20),
                 
                 if (_selectedDreams.isNotEmpty) ...[
-                  Text(
-                    '✨ 선택된 꿈',
-                    style: GoogleFonts.notoSansKr(
-                      color: AppColors.goldText,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    children: [
+                      Icon(Icons.check_circle_rounded, color: AppColors.goldText, size: 16),
+                      const SizedBox(width: 5),
+                      Text(
+                        '선택된 꿈 키워드 (${_selectedDreams.length}/3)',
+                        style: GoogleFonts.notoSansKr(
+                          color: AppColors.goldText,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Wrap(
@@ -217,49 +256,62 @@ class _DreamTabViewState extends State<DreamTabView> {
                   const SizedBox(height: 20),
                 ],
 
-                TextField(
-                  controller: _searchCtrl,
-                  onChanged: _onSearchChanged,
-                  style: GoogleFonts.notoSansKr(
-                    color: AppColors.textPrimary,
-                    fontSize: 15,
+                Container(
+                  decoration: BoxDecoration(
+                    color: isLight ? Colors.white : Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isLight
+                          ? const Color(0xFFD4A017).withValues(alpha: 0.35)
+                          : AppColors.borderGold,
+                      width: 1.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.02),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  decoration: InputDecoration(
-                    hintText: '예: 돼지, 불, 똥, 조상님...',
-                    hintStyle: GoogleFonts.notoSansKr(color: AppColors.textHint),
-                    prefixIcon: Icon(Icons.search, color: AppColors.goldText),
-                    filled: true,
-                    fillColor: isLight ? Colors.white : Colors.black.withValues(alpha: 0.2),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(
-                        color: isLight ? AppColors.lightGoldBorder : AppColors.borderGold.withValues(alpha: 0.5),
-                      ),
+                  child: TextField(
+                    controller: _searchCtrl,
+                    onChanged: _onSearchChanged,
+                    style: GoogleFonts.notoSansKr(
+                      color: AppColors.textPrimary,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w500,
                     ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(
-                        color: isLight ? AppColors.lightGoldBorder : AppColors.borderGold.withValues(alpha: 0.5),
+                    decoration: InputDecoration(
+                      hintText: '예: 돼지, 불, 황금, 용, 조상님...',
+                      hintStyle: GoogleFonts.notoSansKr(
+                        color: AppColors.textHint.withValues(alpha: 0.6),
+                        fontSize: 13.5,
                       ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(
-                        color: AppColors.goldText,
-                        width: 2,
-                      ),
+                      prefixIcon: Icon(Icons.search_rounded, color: AppColors.goldText, size: 21),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                     ),
                   ),
                 ),
                 const SizedBox(height: 20),
-                Text(
-                  _searchCtrl.text.isEmpty ? '🔥 인기 길몽 TOP' : '🔍 검색 결과',
-                  style: GoogleFonts.notoSansKr(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  children: [
+                    Icon(
+                      _searchCtrl.text.isEmpty ? Icons.whatshot_rounded : Icons.manage_search_rounded,
+                      color: _searchCtrl.text.isEmpty ? const Color(0xFFE65100) : AppColors.goldText,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      _searchCtrl.text.isEmpty ? '인기 길몽 키워드' : '검색 결과',
+                      style: GoogleFonts.notoSansKr(
+                        color: AppColors.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 if (_searchResults.isEmpty)
@@ -291,31 +343,49 @@ class _DreamTabViewState extends State<DreamTabView> {
           if (_selectedDreams.isNotEmpty) ...[
             SizedBox(
               height: 56,
-              child: ElevatedButton.icon(
-                onPressed: _isGenerating ? null : _generateDreamNumbers,
-                icon: _isGenerating 
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.auto_awesome),
-                label: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    _isGenerating 
-                        ? '신비로운 번호 추출 중...' 
-                        : _selectedDreams.length == 1
-                            ? '[${_selectedDreams.first}] 행운 번호 조합하기'
-                            : '${_selectedDreams.length}개의 꿈으로 행운 번호 조합하기',
-                    style: GoogleFonts.notoSansKr(fontWeight: FontWeight.bold, fontSize: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: isLight
+                      ? const LinearGradient(
+                          colors: [Color(0xFFB8860B), Color(0xFF92690A)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        )
+                      : null,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (isLight ? AppColors.goldDark : AppColors.gold).withValues(alpha: 0.35),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    HapticFeedback.mediumImpact();
+                    _generateDreamNumbers();
+                  },
+                  icon: const Icon(Icons.auto_awesome_rounded, size: 20),
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      _selectedDreams.length == 1
+                          ? '[${_selectedDreams.first}] 행운 번호 조합하기'
+                          : '${_selectedDreams.length}개 꿈으로 행운 번호 조합하기',
+                      style: GoogleFonts.notoSansKr(fontWeight: FontWeight.w700, fontSize: 16),
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isLight ? Colors.transparent : AppColors.gold,
+                    foregroundColor: isLight ? Colors.white : Colors.black,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.goldText,
-                  foregroundColor: isLight ? Colors.white : Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 4,
-                  shadowColor: AppColors.goldText.withValues(alpha: 0.5),
-                ),
               ),
-            ).animate().slideY(begin: 0.5, end: 0, duration: 400.ms).fadeIn(),
+            ).animate().slideY(begin: 0.3, end: 0, duration: 300.ms).fadeIn(),
             
             const SizedBox(height: 20),
           ],

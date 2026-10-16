@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -112,7 +113,10 @@ class CustomTab extends StatelessWidget {
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: onOpenDialog,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          onOpenDialog();
+                        },
                         borderRadius: BorderRadius.circular(16),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
@@ -126,7 +130,7 @@ class CustomTab extends StatelessWidget {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                hasFilter ? '⚙️ 고정수 / 제외수 변경하기' : '⚙️ 고정수 / 제외수 상세 필터 설정',
+                                hasFilter ? '고정수 / 제외수 변경하기' : '고정수 / 제외수 상세 필터 설정',
                                 style: GoogleFonts.notoSansKr(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 13.5,
@@ -177,10 +181,13 @@ class CustomTab extends StatelessWidget {
                             ],
                           ),
                           child: ElevatedButton.icon(
-                            onPressed: onGenerate,
+                            onPressed: () {
+                              HapticFeedback.mediumImpact();
+                              onGenerate();
+                            },
                             icon: const Icon(Icons.bolt_rounded, color: Colors.white, size: 22),
                             label: Text(
-                              '⚡ 맞춤 번호 조합 추출하기',
+                              '맞춤 번호 조합 추출하기',
                               style: GoogleFonts.notoSansKr(
                                 fontWeight: FontWeight.w800,
                                 fontSize: 15,
@@ -218,11 +225,12 @@ class CustomTab extends StatelessWidget {
                               );
                               return;
                             }
+                            HapticFeedback.mediumImpact();
                             onGenerate();
                           },
                           icon: const Icon(Icons.bolt_rounded, color: Colors.black, size: 22),
                           label: Text(
-                            '⚡ 맞춤 번호 조합 추출하기',
+                            '맞춤 번호 조합 추출하기',
                             style: GoogleFonts.notoSansKr(fontWeight: FontWeight.w800, fontSize: 15),
                           ),
                           style: ElevatedButton.styleFrom(

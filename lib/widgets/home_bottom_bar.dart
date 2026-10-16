@@ -69,7 +69,7 @@ class HomeBottomBar extends StatelessWidget {
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.auto_awesome),
-                  label: '프리미엄 추출',
+                  label: '추출번호',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.analytics_rounded),

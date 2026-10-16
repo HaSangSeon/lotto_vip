@@ -133,6 +133,13 @@ class LottoTypeBadge extends StatelessWidget {
         label = '🎫 실물복권';
         break;
 
+      case LottoEntryType.shake:
+        bg = isLight ? const Color(0xFFFFF3E0) : const Color(0xFFFF9800).withValues(alpha: 0.20);
+        border = isLight ? const Color(0xFFFF9800) : const Color(0xFFFF9800).withValues(alpha: 0.65);
+        textColor = isLight ? const Color(0xFFE65100) : const Color(0xFFFFCC80);
+        label = '🎲 흔들어 뽑기';
+        break;
+
       case LottoEntryType.dream:
         bg = isLight ? const Color(0xFFF3E5F5) : const Color(0xFFAB47BC).withValues(alpha: 0.18);
         border = isLight ? const Color(0xFFAB47BC) : const Color(0xFFAB47BC).withValues(alpha: 0.6);
