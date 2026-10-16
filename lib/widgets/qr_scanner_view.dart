@@ -110,6 +110,13 @@ class _QrScannerViewState extends State<QrScannerView> {
         widget.onHistorySaved?.call();
 
         if (mounted) {
+          // 모달 시트가 화면을 덮는 동안 카메라를 정지하여 배터리 소모 및 발열 방지
+          try {
+            await _controller.stop();
+          } catch (_) {}
+
+          if (!mounted) return;
+
           // 4. 앱 자체 프리미엄 결과 시트 표시
           await QrResultSheet.show(
             context,
@@ -123,6 +130,9 @@ class _QrScannerViewState extends State<QrScannerView> {
           );
 
           if (mounted) {
+            try {
+              await _controller.start();
+            } catch (_) {}
             setState(() => _isProcessing = false);
           }
         }

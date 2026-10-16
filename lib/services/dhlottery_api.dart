@@ -161,27 +161,54 @@ class DHLotteryApi {
     return await _loadFromLocalCache();
   }
 
-  /// 특정 회차 당첨 번호 및 상세 데이터 가져오기
+  /// 특정 회차 당첨 번호 및 상세 데이터 가져오기 (메모리 & 영구 로컬 캐시 적용)
   static Future<DHLotteryResult?> fetchByDrawNo(int drwNo) async {
+    // 1. 메모리 캐시 확인
     if (_drawCache.containsKey(drwNo)) {
       return _drawCache[drwNo];
     }
+
+    // 2. 영구 디스크 캐시(SharedPreferences) 확인 (오프라인 상태에서도 즉시 로드)
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedRaw = prefs.getString('draw_result_$drwNo');
+      if (cachedRaw != null && cachedRaw.isNotEmpty) {
+        final Map<String, dynamic> json = jsonDecode(cachedRaw);
+        final result = DHLotteryResult.fromJson(json);
+        _drawCache[drwNo] = result;
+        return result;
+      }
+    } catch (_) {}
+
+    // 3. 네트워크 통신
     try {
       final response = await http
           .get(Uri.parse('$_baseUrl$drwNo'))
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 5));
           
       if (response.statusCode == 200) {
-        final Map<String, dynamic> body = jsonDecode(response.body);
+        final Map<String, dynamic> body = jsonDecode(utf8.decode(response.bodyBytes));
         final List<dynamic>? list = body['data']?['list'];
         if (list != null && list.isNotEmpty) {
           final result = DHLotteryResult.fromJson(Map<String, dynamic>.from(list[0]));
           _drawCache[drwNo] = result;
+
+          // 과거 회차 결과는 불변이므로 기기에 영구 저장
+          _saveDrawToDiskCache(drwNo, result);
           return result;
         }
       }
     } catch (_) {}
     return null;
+  }
+
+  static Future<void> _saveDrawToDiskCache(int drwNo, DHLotteryResult result) async {
+    try {
+      if (result.numbers.length == 6) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('draw_result_$drwNo', jsonEncode(result.toJson()));
+      }
+    } catch (_) {}
   }
 
   static Future<void> _saveToLocalCache(DHLotteryResult result) async {

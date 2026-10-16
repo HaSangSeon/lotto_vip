@@ -177,6 +177,62 @@ class NotificationService {
     }
   }
 
+  /// 추첨 알림 문구 생성 (회차별 로테이션 및 보관함 등록 여부 맞춤 문구로 유저 리텐션 극대화)
+  static ({String title, String body, String payload}) _getDrawNotificationContent({
+    required int drawNo,
+    required List<LottoHistoryEntry> registeredTickets,
+    bool isTest = false,
+  }) {
+    final String prefix = isTest ? '[테스트] ' : '';
+    final int variant = drawNo % 3;
+
+    if (registeredTickets.isNotEmpty) {
+      final ticket = registeredTickets.first;
+      final totalGames = registeredTickets.fold(0, (sum, t) => sum + t.gameCount);
+      final targetDrawNo = ticket.drawNo;
+      final payload = isTest ? 'test_notification:$targetDrawNo' : 'lotto_draw_result:$targetDrawNo';
+
+      String title;
+      String body;
+
+      switch (variant) {
+        case 0:
+          title = '$prefix✨ [제$targetDrawNo회] 내가 보관한 $totalGames게임에 대박 행운이?';
+          body = '이번 주 추첨 완료! 보관함 번호와 1등 번호를 지금 바로 대조해보세요! 🍀';
+          break;
+        case 1:
+          title = '$prefix🎰 [제$targetDrawNo회] 두근두근! 보관함 번호 추첨 결과 발표';
+          body = '등록해두신 $totalGames게임의 결과가 나왔습니다. 과연 1등의 주인공일까요? 💎';
+          break;
+        default:
+          title = '$prefix🎫 [제$targetDrawNo회] 이번 주 행운의 번호, 확인하셨나요?';
+          body = '보관함에 저장해둔 $totalGames게임의 당첨 결과를 지금 1초 만에 확인해보세요! 🌟';
+          break;
+      }
+      return (title: title, body: body, payload: payload);
+    } else {
+      final payload = isTest ? 'test_notification' : 'lotto_draw_result';
+      String title;
+      String body;
+
+      switch (variant) {
+        case 0:
+          title = '$prefix💰 제$drawNo회 로또 추첨 완료! 1등 당첨번호는?';
+          body = '이번 주 로또 사셨나요? 종이 복권 QR코드를 비추면 1초 만에 당첨을 확인해 드려요! 📸';
+          break;
+        case 1:
+          title = '$prefix🎉 제$drawNo회 1등 당첨번호가 발표되었습니다!';
+          body = '이번 주 행운의 주인공은 누구일까요? 이번 주 당첨 번호와 1등 당첨금을 지금 확인해보세요! 💸';
+          break;
+        default:
+          title = '$prefix🍀 혹시 이번 주 1등? 제$drawNo회 추첨 결과 공개';
+          body = '종이 복권이 있다면 QR 스캔으로 빠르게 맞춰보고, 다음 주 대박 번호도 미리 확인하세요! 🎰';
+          break;
+      }
+      return (title: title, body: body, payload: payload);
+    }
+  }
+
   /// 매주 토요일 저녁 8시 45분 알림 스케줄링 (보관함 등록 복권 여부에 따라 맞춤 문구 적용)
   static Future<void> scheduleWeeklyDrawNotification() async {
     try {
@@ -187,21 +243,14 @@ class NotificationService {
       final history = await HistoryService.load();
       final registeredTickets = history.where((e) => e.drawNo >= upcomingDrawNo).toList();
 
-      final String title;
-      final String body;
-      final String payload;
-
-      if (registeredTickets.isNotEmpty) {
-        final ticket = registeredTickets.first;
-        final totalGames = registeredTickets.fold(0, (sum, t) => sum + t.gameCount);
-        title = '🎫 [제${ticket.drawNo}회] 보관함 번호 추첨 완료!';
-        body = '등록해두신 번호($totalGames게임)의 추첨이 끝났습니다. 지금 당첨 결과를 확인해보세요! 🎰';
-        payload = 'lotto_draw_result:${ticket.drawNo}';
-      } else {
-        title = '💰 혹시… 이번 주 1등 당첨자이신가요?';
-        body = '로또 추첨이 완료되었습니다. 저장해둔 내 번호와 지금 맞춰보세요! 🎰';
-        payload = 'lotto_draw_result';
-      }
+      final content = _getDrawNotificationContent(
+        drawNo: upcomingDrawNo,
+        registeredTickets: registeredTickets,
+        isTest: false,
+      );
+      final title = content.title;
+      final body = content.body;
+      final payload = content.payload;
 
       const AndroidNotificationDetails androidDetails =
           AndroidNotificationDetails(
@@ -293,21 +342,14 @@ class NotificationService {
       final history = await HistoryService.load();
       final registeredTickets = history.where((e) => e.drawNo >= upcomingDrawNo).toList();
 
-      final String title;
-      final String body;
-      final String payload;
-
-      if (registeredTickets.isNotEmpty) {
-        final ticket = registeredTickets.first;
-        final totalGames = registeredTickets.fold(0, (sum, t) => sum + t.gameCount);
-        title = '🎫 [테스트] [제${ticket.drawNo}회] 보관함 번호 추첨 완료!';
-        body = '등록해두신 번호($totalGames게임)의 추첨이 끝났습니다. 지금 당첨 결과를 확인해보세요! 🎰';
-        payload = 'test_notification:${ticket.drawNo}';
-      } else {
-        title = '💰 [테스트] 혹시… 이번 주 1등 당첨자이신가요?';
-        body = '로또 추첨이 완료되었습니다. 저장해둔 내 번호와 지금 맞춰보세요! 🎰';
-        payload = 'test_notification';
-      }
+      final content = _getDrawNotificationContent(
+        drawNo: upcomingDrawNo,
+        registeredTickets: registeredTickets,
+        isTest: true,
+      );
+      final title = content.title;
+      final body = content.body;
+      final payload = content.payload;
 
       const AndroidNotificationDetails androidDetails =
           AndroidNotificationDetails(
@@ -356,21 +398,14 @@ class NotificationService {
       final history = await HistoryService.load();
       final registeredTickets = history.where((e) => e.drawNo >= upcomingDrawNo).toList();
 
-      final String title;
-      final String body;
-      final String payload;
-
-      if (registeredTickets.isNotEmpty) {
-        final ticket = registeredTickets.first;
-        final totalGames = registeredTickets.fold(0, (sum, t) => sum + t.gameCount);
-        title = '🎫 [제${ticket.drawNo}회] 보관함 번호 추첨 완료!';
-        body = '등록해두신 번호($totalGames게임)의 추첨이 끝났습니다. 지금 당첨 결과를 확인해보세요! 🎰';
-        payload = 'lotto_draw_result:${ticket.drawNo}';
-      } else {
-        title = '💰 혹시… 이번 주 1등 당첨자이신가요?';
-        body = '로또 추첨이 완료되었습니다. 저장해둔 내 번호와 지금 맞춰보세요! 🎰';
-        payload = 'lotto_draw_result';
-      }
+      final content = _getDrawNotificationContent(
+        drawNo: upcomingDrawNo,
+        registeredTickets: registeredTickets,
+        isTest: true,
+      );
+      final title = content.title;
+      final body = content.body;
+      final payload = content.payload;
 
       const AndroidNotificationDetails androidDetails =
           AndroidNotificationDetails(

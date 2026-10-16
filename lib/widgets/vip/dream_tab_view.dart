@@ -92,6 +92,7 @@ class _DreamTabViewState extends State<DreamTabView> {
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
+        useSafeArea: true,
         backgroundColor: Colors.transparent,
         builder: (ctx) => ResultSheet(
           title: '🌙 꿈해몽 행운 번호',

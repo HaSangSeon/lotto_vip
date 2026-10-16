@@ -2,7 +2,10 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../theme/app_theme.dart';
+import 'custom/filter_counter_badge.dart';
+import 'custom/filter_number_cell.dart';
 
 class CustomSettingsSheet extends StatefulWidget {
   final List<int> includeNumbers;
@@ -244,17 +247,16 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
               ),
             ),
 
-            // ── 상태 카운터 배지 바 (가로 1단 배치로 대화면 공간 확보) ──
+            // ── 상태 카운터 배지 바 (가로 1단 배치) ─────────
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Row(
                 children: [
-                  // 고정수 카운터
                   Expanded(
-                    child: _buildCounterBadge(
+                    child: FilterCounterBadge(
                       label: '고정수',
                       subLabel: '꼭 넣기',
-                      count: _inc.count,
+                      count: _inc.length,
                       maxCount: 5,
                       primaryColor: const Color(0xFF1976D2),
                       glowColor: const Color(0xFF42A5F5),
@@ -263,12 +265,11 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
                     ),
                   ),
                   const SizedBox(width: 10),
-                  // 제외수 카운터
                   Expanded(
-                    child: _buildCounterBadge(
+                    child: FilterCounterBadge(
                       label: '제외수',
                       subLabel: '빼기',
-                      count: _exc.count,
+                      count: _exc.length,
                       maxCount: 39,
                       primaryColor: const Color(0xFFD32F2F),
                       glowColor: const Color(0xFFEF5350),
@@ -337,10 +338,13 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
                 itemCount: 45,
                 itemBuilder: (context, idx) {
                   final num = idx + 1;
-                  final isInc = _inc.contains(num);
-                  final isExc = _exc.contains(num);
-                  return _buildNumberCell(
-                      num, isInc, isExc, isLight);
+                  return FilterNumberCell(
+                    number: num,
+                    isIncluded: _inc.contains(num),
+                    isExcluded: _exc.contains(num),
+                    isLight: isLight,
+                    onTap: () => _onTapNumber(num),
+                  );
                 },
               ),
             ),
@@ -405,184 +409,21 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
                 max(14.0, MediaQuery.of(context).padding.bottom + 14.0),
               ),
               decoration: BoxDecoration(
-                  color: isLight
-                      ? const Color(0xFFF8F3EA)
-                      : const Color(0xFF10121C),
-                  border: Border(
-                    top: BorderSide(
-                      color: isLight
-                          ? AppColors.lightGoldBorder.withValues(alpha: 0.5)
-                          : AppColors.borderGold.withValues(alpha: 0.25),
-                      width: 1.0,
-                    ),
+                color: isLight
+                    ? const Color(0xFFF8F3EA)
+                    : const Color(0xFF10121C),
+                border: Border(
+                  top: BorderSide(
+                    color: isLight
+                        ? AppColors.lightGoldBorder.withValues(alpha: 0.5)
+                        : AppColors.borderGold.withValues(alpha: 0.25),
+                    width: 1.0,
                   ),
                 ),
-                child: _buildConfirmButton(isLight),
               ),
+              child: _buildConfirmButton(isLight),
+            ),
           ],
-        ),
-      ),
-    );
-  }
-
-  // ── 카운터 배지 위젯 ────────────────────────────────────────────
-  Widget _buildCounterBadge({
-    required String label,
-    String? subLabel,
-    required int count,
-    required int maxCount,
-    required Color primaryColor,
-    required Color glowColor,
-    required IconData icon,
-    required bool isLight,
-  }) {
-    final isFull = count >= maxCount;
-    final displayColor = isFull ? glowColor : primaryColor;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: isLight
-            ? displayColor.withValues(alpha: 0.07)
-            : displayColor.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: displayColor.withValues(alpha: count > 0 ? 0.45 : 0.2),
-          width: count > 0 ? 1.3 : 1.0,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: displayColor),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  style: GoogleFonts.notoSansKr(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: count > 0 ? displayColor : AppColors.textPrimary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-                if (subLabel != null)
-                  Text(
-                    subLabel,
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textHint,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 4),
-          // 카운트 칩
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-            decoration: BoxDecoration(
-              color: count > 0
-                  ? displayColor
-                  : (isLight
-                      ? Colors.black.withValues(alpha: 0.07)
-                      : Colors.white.withValues(alpha: 0.08)),
-              borderRadius: BorderRadius.circular(7),
-            ),
-            child: Text(
-              '$count / $maxCount',
-              style: GoogleFonts.rajdhani(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w800,
-                color: count > 0
-                    ? Colors.white
-                    : AppColors.textSecondary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── 번호 셀 위젯 ────────────────────────────────────────────────
-  Widget _buildNumberCell(int num, bool isInc, bool isExc, bool isLight) {
-    Color? bgColor;
-    List<Color>? gradColors;
-    Color borderColor;
-    Color textColor;
-
-    if (isInc) {
-      gradColors = const [Color(0xFF1E88E5), Color(0xFF0D47A1)];
-      borderColor = const Color(0xFF64B5F6);
-      textColor = Colors.white;
-    } else if (isExc) {
-      gradColors = const [Color(0xFFE53935), Color(0xFFB71C1C)];
-      borderColor = const Color(0xFFEF9A9A);
-      textColor = Colors.white;
-    } else {
-      bgColor = isLight
-          ? Colors.white
-          : AppColors.surface;
-      borderColor = isLight
-          ? AppColors.lightGoldBorder.withValues(alpha: 0.3)
-          : Colors.white.withValues(alpha: 0.1);
-      textColor = AppColors.textSecondary;
-    }
-
-    return GestureDetector(
-      onTap: () => _onTapNumber(num),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: gradColors != null
-              ? LinearGradient(
-                  colors: gradColors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          color: gradColors == null ? bgColor : null,
-          border: Border.all(color: borderColor, width: isInc || isExc ? 1.8 : 1.0),
-          boxShadow: (isInc || isExc)
-              ? [
-                  BoxShadow(
-                    color: (isInc ? const Color(0xFF1E88E5) : const Color(0xFFE53935))
-                        .withValues(alpha: 0.45),
-                    blurRadius: 10,
-                    spreadRadius: 1,
-                  ),
-                ]
-              : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isLight ? 0.05 : 0.15),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1.5),
-                  ),
-                ],
-        ),
-        alignment: Alignment.center,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Padding(
-            padding: const EdgeInsets.all(2),
-            child: Text(
-              num.toString(),
-              style: GoogleFonts.rajdhani(
-                color: textColor,
-                fontWeight: FontWeight.w800,
-                fontSize: 16,
-              ),
-            ),
-          ),
         ),
       ),
     );
@@ -640,8 +481,4 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
       ),
     );
   }
-}
-
-extension _ListCount on List {
-  int get count => length;
 }

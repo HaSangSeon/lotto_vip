@@ -23,6 +23,11 @@ import 'widgets/custom_settings_sheet.dart';
 import 'widgets/result_sheet.dart';
 import 'widgets/notification_settings_dialog.dart';
 import 'widgets/qr_scanner_view.dart';
+import 'widgets/dialogs/calculation_loading_dialog.dart';
+import 'widgets/dialogs/app_info_dialog.dart';
+import 'widgets/home_header.dart';
+import 'widgets/home_bottom_bar.dart';
+import 'widgets/home_background_orbs.dart';
 
 import 'dart:ui' as ui;
 
@@ -397,7 +402,7 @@ class _HomeScreenState extends State<HomeScreen>
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => _CalculationLoadingDialog(
+      builder: (ctx) => CalculationLoadingDialog(
         title: title,
         step1: step1,
         step2: step2,
@@ -546,147 +551,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _showAppInfoDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: AppColors.borderGold, width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.gold.withValues(alpha: 0.15),
-                blurRadius: 28,
-                spreadRadius: 4,
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.gold.withValues(alpha: 0.15),
-                ),
-                child: const Icon(Icons.workspace_premium, color: AppColors.gold, size: 36),
-              ),
-              const SizedBox(height: 12),
-              ShaderMask(
-                shaderCallback: (bounds) => LinearGradient(
-                  colors: AppColors.isLight
-                      ? [AppColors.goldDark, AppColors.gold]
-                      : [AppColors.goldLight, AppColors.gold],
-                ).createShader(bounds),
-                child: Text(
-                  '로또 신통 v1.2.0',
-                  style: GoogleFonts.notoSansKr(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: 2,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '프리미엄 로또 생성기 안내',
-                style: GoogleFonts.notoSansKr(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Divider(height: 1, color: AppColors.borderSubtle),
-              const SizedBox(height: 16),
-              _buildInfoRow(
-                Icons.auto_awesome,
-                '오늘의 행운 번호',
-                '생년월일과 오늘 날짜를 조합하여 매일 나만을 위한 고유 행운 번호를 뽑아드립니다.',
-              ),
-              const SizedBox(height: 12),
-              _buildInfoRow(
-                Icons.tune,
-                '맞춤 번호 조합',
-                '꼭 넣고 싶은 번호와 빼고 싶은 번호를 직접 골라 나만의 로또 번호를 조합합니다.',
-              ),
-              const SizedBox(height: 12),
-              _buildInfoRow(
-                Icons.analytics,
-                '빅데이터 통계 분석',
-                '역대 동행복권 당첨 데이터를 바탕으로 HOT/COLD 번호를 한눈에 분석합니다.',
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.cardHover,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Text(
-                  '※ 본 앱에서 제공하는 번호는 분석 및 알고리즘 기반 참고 자료이며, 실제 당첨을 보장하지 않습니다.',
-                  style: GoogleFonts.notoSansKr(
-                    color: AppColors.textHint,
-                    fontSize: 11,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.gold,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: Text('확인', style: GoogleFonts.notoSansKr(fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String title, String desc) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: AppColors.gold, size: 20),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.notoSansKr(
-                  color: AppColors.textPrimary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                desc,
-                style: GoogleFonts.notoSansKr(
-                  color: AppColors.textSecondary,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
+    AppInfoDialog.show(context);
   }
 
   @override
@@ -701,192 +566,19 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           child: Scaffold(
             backgroundColor: AppColors.black,
-            bottomNavigationBar: Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                border: Border(
-                  top: BorderSide(
-                    color: AppColors.isLight
-                        ? AppColors.lightGoldBorder.withValues(alpha: 0.2)
-                        : AppColors.gold.withValues(alpha: 0.2),
-                    width: 1,
-                  ),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.isLight
-                        ? AppColors.goldDark.withValues(alpha: 0.08)
-                        : Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
-              ),
-              child: SafeArea(
-                top: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildBannerAd(),
-                    BottomNavigationBar(
-                      currentIndex: _selectedTab,
-                      onTap: (index) {
-                        setState(() => _selectedTab = index);
-                        if (index == 3) {
-                          _loadHistory();
-                        }
-                      },
-                      type: BottomNavigationBarType.fixed,
-                      backgroundColor: Colors.transparent,
-                      elevation: 0,
-                      selectedItemColor: AppColors.isLight ? AppColors.goldDark : AppColors.gold,
-                      unselectedItemColor: AppColors.textHint,
-                      selectedLabelStyle: GoogleFonts.notoSansKr(fontWeight: FontWeight.bold, fontSize: 12),
-                      unselectedLabelStyle: GoogleFonts.notoSansKr(fontSize: 11),
-                      items: const [
-                        BottomNavigationBarItem(icon: Icon(Icons.emoji_events_rounded), label: '당첨 확인'),
-                        BottomNavigationBarItem(icon: Icon(Icons.auto_awesome), label: '프리미엄 추출'),
-                        BottomNavigationBarItem(icon: Icon(Icons.analytics_rounded), label: '통계 분석'),
-                        BottomNavigationBarItem(icon: Icon(Icons.history_rounded), label: '보관함'),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+            bottomNavigationBar: HomeBottomBar(
+              selectedTab: _selectedTab,
+              bannerAdWidget: _buildBannerAd(),
+              onTabSelected: (index) {
+                setState(() => _selectedTab = index);
+                if (index == 3) {
+                  _loadHistory();
+                }
+              },
             ),
             body: Stack(
               children: [
-                // 🌟 1. 베이스 럭셔리 실크 그라데이션 (GPU 셰이더 연산, 메모리 0MB 소모)
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: AppColors.isLight
-                            ? const [
-                                Color(0xFFFCF9F3), // 샴페인 크림
-                                Color(0xFFF7F1E6), // 실크 아이보리
-                                Color(0xFFEFE6D5), // 웜 골드 언더톤
-                                Color(0xFFF5ECE0), // 소프트 캐시미어
-                              ]
-                            : const [
-                                Color(0xFF10121D), // 옵시디언 네이비
-                                Color(0xFF0C0E16), // 딥 미드나이트
-                                Color(0xFF07080D), // 퓨어 스페이스 블랙
-                              ],
-                        stops: AppColors.isLight ? const [0.0, 0.35, 0.75, 1.0] : const [0.0, 0.5, 1.0],
-                      ),
-                    ),
-                  ),
-                ),
-
-                // 🌟 2. 앰비언트 럭셔리 라이팅 오브 (자연스러운 깊이감)
-                if (AppColors.isLight) ...[
-                  Positioned(
-                    top: -60,
-                    right: -40,
-                    child: Container(
-                      width: 340,
-                      height: 340,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            const Color(0xFFE5B842).withValues(alpha: 0.16),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 100,
-                    left: -70,
-                    child: Container(
-                      width: 260,
-                      height: 260,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            const Color(0xFFF4C2A5).withValues(alpha: 0.12),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 80,
-                    left: -60,
-                    child: Container(
-                      width: 300,
-                      height: 300,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            const Color(0xFFD4AF37).withValues(alpha: 0.12),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  Positioned(
-                    top: -80,
-                    right: -50,
-                    child: Container(
-                      width: 360,
-                      height: 360,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            AppColors.gold.withValues(alpha: 0.12),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 120,
-                    left: -80,
-                    child: Container(
-                      width: 280,
-                      height: 280,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            const Color(0xFF7B2CBF).withValues(alpha: 0.08),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 80,
-                    left: -80,
-                    child: Container(
-                      width: 300,
-                      height: 300,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            AppColors.purple.withValues(alpha: 0.10),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                const HomeBackgroundOrbs(),
                 SafeArea(
                   child: Column(
                     children: [
@@ -909,209 +601,21 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildHeader() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: AppColors.isLight
-          ? BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: AppColors.lightGoldBorder.withValues(alpha: 0.25),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.goldDark.withValues(alpha: 0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-                BoxShadow(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  blurRadius: 0,
-                  spreadRadius: 0,
-                  offset: const Offset(0, 0),
-                ),
-              ],
-            )
-          : null,
-      child: Row(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ShaderMask(
-                shaderCallback: (bounds) => LinearGradient(
-                  colors: AppColors.isLight
-                      ? [AppColors.goldDeep, AppColors.goldDark, AppColors.gold]
-                      : [AppColors.goldLight, AppColors.gold, AppColors.goldDark],
-                ).createShader(bounds),
-                child: Text(
-                  '로또 신통',
-                  style: GoogleFonts.notoSansKr(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ),
-              Text(
-                '프리미엄 번호 생성기',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 10.5,
-                  color: AppColors.isLight ? AppColors.goldDeep.withValues(alpha: 0.7) : AppColors.textSecondary,
-                  letterSpacing: 1.4,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          // 📷 QR 스캔 전용 버튼 (한눈에 알아볼 수 있는 에메랄드 뱃지)
-          InkWell(
-            onTap: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => QrScannerView(
-                    onHistorySaved: _loadHistory,
-                  ),
-                ),
-              );
-              _loadHistory();
-            },
-            borderRadius: BorderRadius.circular(17),
-            child: Container(
-              height: 34,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: AppColors.isLight
-                    ? const Color(0xFFFFF6DF)
-                    : AppColors.gold.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(17),
-                border: Border.all(
-                  color: AppColors.isLight
-                      ? AppColors.lightGoldBorder.withValues(alpha: 0.7)
-                      : AppColors.borderGold.withValues(alpha: 0.4),
-                  width: 1.2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: (AppColors.isLight ? AppColors.goldDark : AppColors.gold)
-                        .withValues(alpha: 0.08),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1.5),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.qr_code_scanner_rounded,
-                    size: 16,
-                    color: AppColors.isLight ? AppColors.goldDeep : AppColors.gold,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'QR스캔',
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.isLight ? AppColors.goldDeep : AppColors.gold,
-                    ),
-                  ),
-                ],
-              ),
+    return HomeHeader(
+      onQrScanTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => QrScannerView(
+              onHistorySaved: _loadHistory,
             ),
           ),
-          const SizedBox(width: 4),
-          Container(
-            width: 34,
-            height: 34,
-            decoration: AppColors.isLight
-                ? BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.lightAccentAmber.withValues(alpha: 0.6),
-                  )
-                : null,
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              iconSize: 19,
-              icon: Icon(
-                Icons.notifications_outlined,
-                color: AppColors.isLight ? AppColors.goldDeep : AppColors.textSecondary,
-              ),
-              tooltip: '추첨 알림 설정',
-              onPressed: _showNotificationSettingsDialog,
-            ),
-          ),
-          const SizedBox(width: 3),
-          Container(
-            width: 34,
-            height: 34,
-            decoration: AppColors.isLight
-                ? BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.lightAccentAmber.withValues(alpha: 0.6),
-                  )
-                : null,
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              iconSize: 19,
-              icon: Icon(
-                AppTheme.themeModeNotifier.value == ThemeMode.light
-                    ? Icons.dark_mode_rounded
-                    : Icons.light_mode_rounded,
-                color: AppColors.isLight ? AppColors.goldDeep : AppColors.textSecondary,
-              ),
-              tooltip: '테마 변경',
-              onPressed: AppTheme.toggleTheme,
-            ),
-          ),
-          const SizedBox(width: 3),
-          GestureDetector(
-            onTap: _showAppInfoDialog,
-            behavior: HitTestBehavior.opaque,
-            child: AnimatedBuilder(
-              animation: _pulseCtrl,
-              builder: (_, _) => Container(
-                width: 34,
-                height: 34,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: AppColors.isLight
-                      ? LinearGradient(
-                          colors: [
-                            AppColors.goldDark,
-                            AppColors.goldDeep,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : null,
-                  color: AppColors.isLight ? null : AppColors.card,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.isLight
-                          ? AppColors.goldDark.withValues(alpha: 0.25 + _pulseCtrl.value * 0.15)
-                          : AppColors.gold.withValues(alpha: 0.1 + _pulseCtrl.value * 0.15),
-                      blurRadius: 14,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.workspace_premium,
-                  color: AppColors.isLight ? Colors.white : AppColors.gold,
-                  size: 19,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+        _loadHistory();
+      },
+      onNotificationTap: _showNotificationSettingsDialog,
+      onAppInfoTap: _showAppInfoDialog,
+      pulseAnimation: _pulseCtrl,
     );
   }
 
@@ -1167,134 +671,6 @@ class _HomeScreenState extends State<HomeScreen>
         width: _bannerAd!.size.width.toDouble(),
         height: _bannerAd!.size.height.toDouble(),
         child: _bannerAdWidget!,
-      ),
-    );
-  }
-}
-
-class _CalculationLoadingDialog extends StatefulWidget {
-  final String title;
-  final String step1;
-  final String step2;
-
-  const _CalculationLoadingDialog({
-    required this.title,
-    required this.step1,
-    required this.step2,
-  });
-
-  @override
-  State<_CalculationLoadingDialog> createState() => _CalculationLoadingDialogState();
-}
-
-class _CalculationLoadingDialogState extends State<_CalculationLoadingDialog> {
-  late String _currentStep;
-  Timer? _stepTimer;
-  Timer? _closeTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentStep = widget.step1;
-    _stepTimer = Timer(const Duration(milliseconds: 650), () {
-      if (mounted) {
-        setState(() => _currentStep = widget.step2);
-      }
-    });
-    _closeTimer = Timer(const Duration(milliseconds: 1300), () {
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _stepTimer?.cancel();
-    _closeTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: AppColors.isLight ? AppColors.lightGoldBorder : AppColors.borderGold,
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.gold.withValues(alpha: 0.25),
-              blurRadius: 30,
-              spreadRadius: 4,
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.gold.withValues(alpha: 0.12),
-              ),
-              child: Center(
-                child: SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 3,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppColors.isLight ? AppColors.goldDark : AppColors.gold,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              widget.title,
-              style: GoogleFonts.notoSansKr(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 10),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              child: Text(
-                _currentStep,
-                key: ValueKey(_currentStep),
-                textAlign: TextAlign.center,
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 13,
-                  color: AppColors.isLight ? AppColors.goldDark : AppColors.goldLight,
-                  fontWeight: FontWeight.w600,
-                  height: 1.4,
-                ),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '알고리즘 연산 진행 중...',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 11,
-                color: AppColors.textHint,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

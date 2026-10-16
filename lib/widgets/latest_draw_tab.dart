@@ -5,9 +5,10 @@ import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/dhlottery_api.dart';
 import 'common_widgets.dart';
-import 'lotto_ball.dart';
 import 'latest_draw/draw_select_dialog.dart';
 import 'latest_draw/prize_section_view.dart';
+import 'latest_draw/winning_numbers_showcase.dart';
+import 'latest_draw/draw_nav_header.dart';
 
 class LatestDrawTab extends StatefulWidget {
   const LatestDrawTab({super.key});
@@ -193,11 +194,18 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
                   child: Column(
                     children: [
                       // 회차 네비게이션 헤더 & 추첨일
-                      _buildDrawHeader(result),
+                      DrawNavHeader(
+                        result: result,
+                        latestDrwNo: _latestDrwNo,
+                        onPrevDraw: _goToPrevDraw,
+                        onNextDraw: _goToNextDraw,
+                        onSelectDraw: _showDrawSelectDialog,
+                        onGoLatest: () => _fetchData(_latestDrwNo!),
+                      ),
                       const SizedBox(height: 18),
 
                       // 당첨 번호 & 보너스 번호 프리미엄 쇼케이스
-                      _buildWinningNumbersShowcase(result),
+                      WinningNumbersShowcase(result: result),
                       const SizedBox(height: 18),
 
                       // 당첨금 및 주요 내역 섹션
@@ -277,270 +285,5 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
     );
   }
 
-  /// 회차 네비게이션 헤더 및 추첨일 칩
-  Widget _buildDrawHeader(DHLotteryResult result) {
-    final isLight = AppColors.isLight;
-    
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // 이전 회차 버튼
-            IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-              color: (_result!.drwNo > 1)
-                  ? (isLight ? AppColors.goldDeep : AppColors.gold)
-                  : AppColors.textHint.withValues(alpha: 0.2),
-              onPressed: (_result!.drwNo > 1) ? _goToPrevDraw : null,
-              tooltip: '이전 회차',
-            ),
-            const SizedBox(width: 8),
-
-            // 회차 뱃지 (클릭 시 회차 직접 입력 팝업)
-            InkWell(
-              onTap: _showDrawSelectDialog,
-              borderRadius: BorderRadius.circular(30),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isLight
-                        ? [const Color(0xFFFFFDF5), const Color(0xFFFFF3D4)]
-                        : [const Color(0xFF2C2616), const Color(0xFF1E190D)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                    color: AppColors.gold.withValues(alpha: isLight ? 0.6 : 0.4),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.gold.withValues(alpha: isLight ? 0.2 : 0.1),
-                      blurRadius: 15,
-                      spreadRadius: 2,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '제 ${result.drwNo}회',
-                      style: GoogleFonts.rajdhani(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.goldText,
-                        letterSpacing: 0.5,
-                        shadows: [
-                          Shadow(
-                            color: AppColors.gold.withValues(alpha: 0.4),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          )
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      Icons.arrow_drop_down_circle_outlined,
-                      size: 18,
-                      color: AppColors.goldText.withValues(alpha: 0.8),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-
-            // 다음 회차 버튼
-            IconButton(
-              icon: const Icon(Icons.arrow_forward_ios_rounded, size: 20),
-              color: (_latestDrwNo != null && _result!.drwNo < _latestDrwNo!)
-                  ? (isLight ? AppColors.goldDeep : AppColors.gold)
-                  : AppColors.textHint.withValues(alpha: 0.2),
-              onPressed: (_latestDrwNo != null && _result!.drwNo < _latestDrwNo!) ? _goToNextDraw : null,
-              tooltip: '다음 회차',
-            ),
-          ],
-        ),
-
-        // 최신 회차가 아닐 때 "최신 회차로 바로가기" 버튼
-        if (_latestDrwNo != null && result.drwNo < _latestDrwNo!) ...[
-          const SizedBox(height: 12),
-          InkWell(
-            onTap: () => _fetchData(_latestDrwNo!),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: isLight ? Colors.white : Colors.black.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: AppColors.gold.withValues(alpha: 0.3),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.update_rounded, size: 16, color: AppColors.goldText),
-                  const SizedBox(width: 6),
-                  Text(
-                    '최신 제 $_latestDrwNo회로 이동',
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.goldText,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-
-        const SizedBox(height: 12),
-        Text(
-          '${result.drwNoDate} 추첨',
-          style: GoogleFonts.notoSansKr(
-            color: AppColors.textSecondary,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// 당첨 번호 & 보너스 번호 통합 쇼케이스 박스
-  Widget _buildWinningNumbersShowcase(DHLotteryResult result) {
-    final isLight = AppColors.isLight;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      decoration: BoxDecoration(
-        color: isLight ? Colors.white : const Color(0xFF161825),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: isLight ? Colors.white : Colors.white.withValues(alpha: 0.03),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isLight ? 0.04 : 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-          // 은은한 골드 이너 글로우
-          BoxShadow(
-            color: AppColors.gold.withValues(alpha: 0.03),
-            blurRadius: 40,
-            spreadRadius: -10,
-            offset: const Offset(0, 0),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // 6개 당첨 번호 라벨
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.stars_rounded, color: AppColors.gold, size: 18),
-              const SizedBox(width: 6),
-              Text(
-                '당첨 번호',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: isLight ? AppColors.goldDeep : AppColors.goldText,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          
-          // 6개의 당첨 번호 공
-          LottoBallRow(numbers: result.numbers, ballSize: 42),
-          
-          const SizedBox(height: 24),
-          
-          // 보너스 번호 섹션 (시각적 구분감 강화)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // 왼쪽 장식선
-              Expanded(
-                child: Container(
-                  height: 1,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.transparent, AppColors.borderGold.withValues(alpha: 0.5)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              
-              // 보너스 아이콘과 + 기호 결합
-              Column(
-                children: [
-                  Icon(
-                    Icons.add_circle_rounded,
-                    color: isLight ? const Color(0xFFE65100) : const Color(0xFFFF9800),
-                    size: 24,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'BONUS',
-                    style: GoogleFonts.rajdhani(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: isLight ? const Color(0xFFE65100) : const Color(0xFFFF9800),
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 16),
-              
-              // 보너스 공
-              LottoBall(number: result.bonusNo, size: 48, isBonus: true),
-              const SizedBox(width: 16),
-              
-              // 오른쪽 장식선
-              Expanded(
-                child: Container(
-                  height: 1,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppColors.borderGold.withValues(alpha: 0.5), Colors.transparent],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-
-
-
-
-
-
 }
+

@@ -14,3 +14,6 @@
 # Mobile Scanner
 -keep class dev.nhancv.mobile_scanner.** { *; }
 -keep class com.google.mlkit.** { *; }
+
+# Flutter Local Notifications
+-keep class com.dexterous.flutterlocalnotifications.** { *; }
