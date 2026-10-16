@@ -4,22 +4,28 @@ import '../theme/app_theme.dart';
 
 /// 홈 화면 배경 럭셔리 실크 그라데이션 및 골드/퍼플 글로우 원형 오라 데코레이션 위젯
 class HomeBackgroundOrbs extends StatelessWidget {
-  const HomeBackgroundOrbs({super.key});
+  final bool? isLight;
+
+  const HomeBackgroundOrbs({
+    super.key,
+    this.isLight,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isLight = AppColors.isLight;
+    final effectiveIsLight = isLight ?? AppColors.isLight;
 
-    return Stack(
-      children: [
-        // 1. 베이스 럭셔리 실크 그라데이션 (GPU 셰이더 연산, 메모리 0MB 소모)
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isLight
+    return SizedBox.expand(
+      child: Stack(
+        children: [
+          // 1. 베이스 럭셔리 실크 그라데이션 (GPU 셰이더 연산, 메모리 0MB 소모)
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: effectiveIsLight
                     ? const [
                         Color(0xFFFCF9F2), // 최상단: 따뜻하고 부드러운 샴페인 밀크
                         Color(0xFFF9F5EC), // 중간: 안정적인 프리미엄 아이보리 실크
@@ -36,7 +42,7 @@ class HomeBackgroundOrbs extends StatelessWidget {
         ),
 
         // 2. 미세 글로우 오라 데코레이션
-        if (isLight) ...[
+        if (effectiveIsLight) ...[
           Positioned(
             top: -120,
             right: -80,
@@ -142,6 +148,7 @@ class HomeBackgroundOrbs extends StatelessWidget {
           ),
         ],
       ],
-    );
+    ),
+  );
   }
 }

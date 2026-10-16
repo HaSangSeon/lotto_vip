@@ -8,24 +8,26 @@ class HomeBottomBar extends StatelessWidget {
   final int selectedTab;
   final ValueChanged<int> onTabSelected;
   final Widget? bannerAdWidget;
+  final bool? isLight;
 
   const HomeBottomBar({
     super.key,
     required this.selectedTab,
     required this.onTabSelected,
     this.bannerAdWidget,
+    this.isLight,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isLight = AppColors.isLight;
+    final effectiveIsLight = isLight ?? AppColors.isLight;
 
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border(
           top: BorderSide(
-            color: isLight
+            color: effectiveIsLight
                 ? AppColors.lightGoldBorder.withValues(alpha: 0.2)
                 : AppColors.gold.withValues(alpha: 0.2),
             width: 1,
@@ -33,7 +35,7 @@ class HomeBottomBar extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: isLight
+            color: effectiveIsLight
                 ? AppColors.goldDark.withValues(alpha: 0.08)
                 : Colors.black.withValues(alpha: 0.3),
             blurRadius: 20,
@@ -53,7 +55,7 @@ class HomeBottomBar extends StatelessWidget {
               type: BottomNavigationBarType.fixed,
               backgroundColor: Colors.transparent,
               elevation: 0,
-              selectedItemColor: isLight ? AppColors.goldDark : AppColors.gold,
+              selectedItemColor: effectiveIsLight ? AppColors.goldDark : AppColors.gold,
               unselectedItemColor: AppColors.textHint,
               selectedLabelStyle: GoogleFonts.notoSansKr(
                 fontWeight: FontWeight.bold,

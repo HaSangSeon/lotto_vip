@@ -566,16 +566,18 @@ class _HomeScreenState extends State<HomeScreen>
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: AppTheme.themeModeNotifier,
       builder: (context, themeMode, _) {
+        final isLight = themeMode == ThemeMode.light;
         return AnnotatedRegion<SystemUiOverlayStyle>(
           value: SystemUiOverlayStyle(
             statusBarColor: Colors.transparent,
-            statusBarIconBrightness: AppColors.isLight ? Brightness.dark : Brightness.light,
+            statusBarIconBrightness: isLight ? Brightness.dark : Brightness.light,
           ),
           child: Scaffold(
-            backgroundColor: AppColors.black,
+            backgroundColor: isLight ? AppColors.lightBg1 : const Color(0xFF0B0D14),
             bottomNavigationBar: HomeBottomBar(
               selectedTab: _selectedTab,
               bannerAdWidget: _buildBannerAd(),
+              isLight: isLight,
               onTabSelected: (index) {
                 setState(() => _selectedTab = index);
                 if (index == 3) {
@@ -585,11 +587,16 @@ class _HomeScreenState extends State<HomeScreen>
             ),
             body: Stack(
               children: [
-                const HomeBackgroundOrbs(),
+                Positioned.fill(
+                  child: HomeBackgroundOrbs(
+                    key: ValueKey('orbs_$themeMode'),
+                    isLight: isLight,
+                  ),
+                ),
                 SafeArea(
                   child: Column(
                     children: [
-                      _buildHeader(),
+                      _buildHeader(isLight),
                       Expanded(
                         child: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 300),
@@ -607,8 +614,9 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(bool isLight) {
     return HomeHeader(
+      isLight: isLight,
       onQrScanTap: () async {
         await Navigator.push(
           context,

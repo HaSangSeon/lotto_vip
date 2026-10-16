@@ -49,7 +49,7 @@ class AppInfoDialog extends StatelessWidget {
                     : [AppColors.goldLight, AppColors.gold],
               ).createShader(bounds),
               child: Text(
-                '로또 신통 v1.1.1',
+                '로또 신통 v1.1.4',
                 style: GoogleFonts.notoSansKr(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,

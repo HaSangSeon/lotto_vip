@@ -128,24 +128,7 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
     final isRollover = result.isRollover;
     final isLight = AppColors.isLight;
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: isLight
-              ? [
-                  const Color(0xFFFBF8F2),
-                  const Color(0xFFF4ECE1),
-                  const Color(0xFFEFE6D6),
-                ]
-              : [
-                  const Color(0xFF10131E),
-                  const Color(0xFF0C0E16),
-                  const Color(0xFF08090E),
-                ],
-        ),
-      ),
+    return SizedBox.expand(
       child: Stack(
         children: [
           // 상단 은은한 앰비언트 골드 오로라 글로우 효과

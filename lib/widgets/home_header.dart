@@ -7,6 +7,7 @@ class HomeHeader extends StatelessWidget {
   final VoidCallback onNotificationTap;
   final VoidCallback onAppInfoTap;
   final Animation<double> pulseAnimation;
+  final bool? isLight;
 
   const HomeHeader({
     super.key,
@@ -14,14 +15,17 @@ class HomeHeader extends StatelessWidget {
     required this.onNotificationTap,
     required this.onAppInfoTap,
     required this.pulseAnimation,
+    this.isLight,
   });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveIsLight = isLight ?? AppColors.isLight;
+
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 10, 14, 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: AppColors.isLight
+      decoration: effectiveIsLight
           ? BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(20),
@@ -50,7 +54,7 @@ class HomeHeader extends StatelessWidget {
             children: [
               ShaderMask(
                 shaderCallback: (bounds) => LinearGradient(
-                  colors: AppColors.isLight
+                  colors: effectiveIsLight
                       ? [AppColors.goldDeep, AppColors.goldDark, AppColors.gold]
                       : [AppColors.goldLight, AppColors.gold, AppColors.goldDark],
                 ).createShader(bounds),
@@ -68,7 +72,7 @@ class HomeHeader extends StatelessWidget {
                 '프리미엄 번호 생성기',
                 style: GoogleFonts.notoSansKr(
                   fontSize: 10.5,
-                  color: AppColors.isLight ? AppColors.goldDeep.withValues(alpha: 0.7) : AppColors.textSecondary,
+                  color: effectiveIsLight ? AppColors.goldDeep.withValues(alpha: 0.7) : AppColors.textSecondary,
                   letterSpacing: 1.4,
                   fontWeight: FontWeight.w500,
                 ),
@@ -84,19 +88,19 @@ class HomeHeader extends StatelessWidget {
               height: 34,
               padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
-                color: AppColors.isLight
+                color: effectiveIsLight
                     ? const Color(0xFFFFF6DF)
                     : AppColors.gold.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(17),
                 border: Border.all(
-                  color: AppColors.isLight
+                  color: effectiveIsLight
                       ? AppColors.lightGoldBorder.withValues(alpha: 0.7)
                       : AppColors.borderGold.withValues(alpha: 0.4),
                   width: 1.2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (AppColors.isLight ? AppColors.goldDark : AppColors.gold)
+                    color: (effectiveIsLight ? AppColors.goldDark : AppColors.gold)
                         .withValues(alpha: 0.08),
                     blurRadius: 4,
                     offset: const Offset(0, 1.5),
@@ -109,7 +113,7 @@ class HomeHeader extends StatelessWidget {
                   Icon(
                     Icons.qr_code_scanner_rounded,
                     size: 16,
-                    color: AppColors.isLight ? AppColors.goldDeep : AppColors.gold,
+                    color: effectiveIsLight ? AppColors.goldDeep : AppColors.gold,
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -117,7 +121,7 @@ class HomeHeader extends StatelessWidget {
                     style: GoogleFonts.notoSansKr(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.isLight ? AppColors.goldDeep : AppColors.gold,
+                      color: effectiveIsLight ? AppColors.goldDeep : AppColors.gold,
                     ),
                   ),
                 ],
@@ -128,7 +132,7 @@ class HomeHeader extends StatelessWidget {
           Container(
             width: 34,
             height: 34,
-            decoration: AppColors.isLight
+            decoration: effectiveIsLight
                 ? BoxDecoration(
                     shape: BoxShape.circle,
                     color: AppColors.lightAccentAmber.withValues(alpha: 0.6),
@@ -139,7 +143,7 @@ class HomeHeader extends StatelessWidget {
               iconSize: 19,
               icon: Icon(
                 Icons.notifications_outlined,
-                color: AppColors.isLight ? AppColors.goldDeep : AppColors.textSecondary,
+                color: effectiveIsLight ? AppColors.goldDeep : AppColors.textSecondary,
               ),
               tooltip: '추첨 알림 설정',
               onPressed: onNotificationTap,
@@ -149,7 +153,7 @@ class HomeHeader extends StatelessWidget {
           Container(
             width: 34,
             height: 34,
-            decoration: AppColors.isLight
+            decoration: effectiveIsLight
                 ? BoxDecoration(
                     shape: BoxShape.circle,
                     color: AppColors.lightAccentAmber.withValues(alpha: 0.6),
@@ -159,10 +163,10 @@ class HomeHeader extends StatelessWidget {
               padding: EdgeInsets.zero,
               iconSize: 19,
               icon: Icon(
-                AppTheme.themeModeNotifier.value == ThemeMode.light
+                effectiveIsLight
                     ? Icons.dark_mode_rounded
                     : Icons.light_mode_rounded,
-                color: AppColors.isLight ? AppColors.goldDeep : AppColors.textSecondary,
+                color: effectiveIsLight ? AppColors.goldDeep : AppColors.textSecondary,
               ),
               tooltip: '테마 변경',
               onPressed: AppTheme.toggleTheme,
@@ -180,7 +184,7 @@ class HomeHeader extends StatelessWidget {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: AppColors.isLight
+                  gradient: effectiveIsLight
                       ? LinearGradient(
                           colors: [
                             AppColors.goldDark,
@@ -190,10 +194,10 @@ class HomeHeader extends StatelessWidget {
                           end: Alignment.bottomRight,
                         )
                       : null,
-                  color: AppColors.isLight ? null : AppColors.card,
+                  color: effectiveIsLight ? null : AppColors.card,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.isLight
+                      color: effectiveIsLight
                           ? AppColors.goldDark.withValues(alpha: 0.25 + pulseAnimation.value * 0.15)
                           : AppColors.gold.withValues(alpha: 0.1 + pulseAnimation.value * 0.15),
                       blurRadius: 14,
@@ -203,7 +207,7 @@ class HomeHeader extends StatelessWidget {
                 ),
                 child: Icon(
                   Icons.workspace_premium,
-                  color: AppColors.isLight ? Colors.white : AppColors.gold,
+                  color: effectiveIsLight ? Colors.white : AppColors.gold,
                   size: 19,
                 ),
               ),
