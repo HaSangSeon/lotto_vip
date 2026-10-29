@@ -10,13 +10,16 @@ import '../../services/history_service.dart';
 import '../../services/notification_service.dart';
 import '../common_widgets.dart';
 import '../result_sheet.dart';
+import '../lotto_ball.dart';
 import '../dialogs/calculation_loading_dialog.dart';
 
 class DreamTabView extends StatefulWidget {
+  final bool? isLight;
   final void Function(String title, List<int> numbers)? onShowResult;
 
   const DreamTabView({
     super.key,
+    this.isLight,
     this.onShowResult,
   });
 
@@ -29,17 +32,32 @@ class _DreamTabViewState extends State<DreamTabView> {
   List<String> _searchResults = DreamDictionary.popularKeywords;
   
   final List<String> _selectedDreams = [];
+  List<int> _recentNumbers = [];
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
   
-  // 현재 선택된 꿈들로 만들 수 있는 고정수 계산
+  // 현재 선택된 꿈들로 만들 수 있는 고정수 계산 (각 꿈에서 공평하게 추출, 최대 4개 고정수로 제한하여 최소 2개는 매번 새로운 조합 부여)
   Set<int> get _currentFixedNumbers {
     final Set<int> result = {};
-    for (final dream in _selectedDreams) {
-      result.addAll(DreamDictionary.getNumbers(dream));
+    if (_selectedDreams.isEmpty) return result;
+
+    if (_selectedDreams.length == 1) {
+      final nums = DreamDictionary.getNumbers(_selectedDreams.first);
+      return nums.take(3).toSet();
     }
-    // 6개를 초과하면 앞에서부터 6개만 자르기
-    final list = result.toList();
-    if (list.length > 6) {
-      return list.sublist(0, 6).toSet();
+
+    // 2개 이상일 때는 각 꿈에서 1~2개씩 공평하게 추가
+    for (final dream in _selectedDreams) {
+      final nums = DreamDictionary.getNumbers(dream);
+      for (final n in nums) {
+        if (result.length < 4) {
+          result.add(n);
+        }
+      }
     }
     return result;
   }
@@ -58,9 +76,13 @@ class _DreamTabViewState extends State<DreamTabView> {
         if (_selectedDreams.length >= 3) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('꿈 키워드는 최대 3개까지만 선택할 수 있습니다.'),
+              content: Text(
+                '꿈 키워드는 최대 3개까지만 선택할 수 있습니다.',
+                style: GoogleFonts.notoSansKr(fontWeight: FontWeight.w600, color: Colors.white),
+              ),
               behavior: SnackBarBehavior.floating,
-              backgroundColor: AppColors.isLight ? Colors.black87 : Colors.white70,
+              backgroundColor: const Color(0xFFD32F2F),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           );
           return;
@@ -97,6 +119,24 @@ class _DreamTabViewState extends State<DreamTabView> {
     
     final finalNumbers = resultSet.toList()..sort();
 
+    setState(() {
+      _recentNumbers = finalNumbers;
+    });
+
+    // 1. 보관함(히스토리)에 먼저 안전하게 저장 (UI 동기화 보장)
+    final upcomingDrawNo = HistoryService.calculateTargetDrawNo(DateTime.now());
+    final dreamNames = _selectedDreams.join(', ');
+    final entry = LottoHistoryEntry(
+      title: '제$upcomingDrawNo회 꿈해몽 ($dreamNames)',
+      numbers: finalNumbers,
+      createdAt: DateTime.now(),
+    );
+    await HistoryService.save(entry);
+    await NotificationService.scheduleWeeklyDrawNotification();
+
+    if (!mounted) return;
+
+    // 2. 결과 시트 호출 및 홈 화면 히스토리 갱신
     if (widget.onShowResult != null) {
       widget.onShowResult!('🌙 꿈해몽 행운 번호', finalNumbers);
     } else {
@@ -112,17 +152,6 @@ class _DreamTabViewState extends State<DreamTabView> {
         ),
       );
     }
-
-    // 보관함(히스토리)에 자동 저장 로직
-    final upcomingDrawNo = HistoryService.calculateTargetDrawNo(DateTime.now());
-    final dreamNames = _selectedDreams.join(', ');
-    final entry = LottoHistoryEntry(
-      title: '제$upcomingDrawNo회 꿈해몽 ($dreamNames)',
-      numbers: finalNumbers,
-      createdAt: DateTime.now(),
-    );
-    await HistoryService.save(entry);
-    await NotificationService.scheduleWeeklyDrawNotification();
   }
 
   Widget _buildKeywordChip(String keyword, bool isSelected) {
@@ -188,10 +217,10 @@ class _DreamTabViewState extends State<DreamTabView> {
 
   @override
   Widget build(BuildContext context) {
-    final isLight = AppColors.isLight;
+    final isLight = widget.isLight ?? (Theme.of(context).brightness == Brightness.light);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -277,6 +306,7 @@ class _DreamTabViewState extends State<DreamTabView> {
                   child: TextField(
                     controller: _searchCtrl,
                     onChanged: _onSearchChanged,
+                    maxLength: 15,
                     style: GoogleFonts.notoSansKr(
                       color: AppColors.textPrimary,
                       fontSize: 14.5,
@@ -290,6 +320,7 @@ class _DreamTabViewState extends State<DreamTabView> {
                       ),
                       prefixIcon: Icon(Icons.search_rounded, color: AppColors.goldText, size: 21),
                       border: InputBorder.none,
+                      counterText: '',
                       contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                     ),
                   ),
@@ -390,6 +421,103 @@ class _DreamTabViewState extends State<DreamTabView> {
             const SizedBox(height: 20),
           ],
 
+          // 3. 방금 뽑은 꿈해몽 번호 결과 카드
+          if (_recentNumbers.isNotEmpty) ...[
+            GlassCard(
+              gradientColors: isLight
+                  ? const [Color(0xFFFFFDF5), Color(0xFFFFF6DF)]
+                  : const [Color(0xFF1D1702), Color(0xFF100C01)],
+              borderColor: isLight
+                  ? const Color(0xFFD4AF37).withValues(alpha: 0.6)
+                  : AppColors.borderGold,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+              shadows: isLight
+                  ? [
+                      BoxShadow(
+                        color: AppColors.goldDark.withValues(alpha: 0.08),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : [
+                      BoxShadow(
+                        color: AppColors.gold.withValues(alpha: 0.12),
+                        blurRadius: 18,
+                        spreadRadius: 1,
+                      ),
+                    ],
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.stars_rounded,
+                              color: isLight ? AppColors.goldDeep : AppColors.gold,
+                              size: 19,
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                '방금 뽑은 꿈해몽 번호',
+                                style: GoogleFonts.notoSansKr(
+                                  color: isLight ? AppColors.goldDeep : AppColors.goldText,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isLight ? const Color(0xFFE8F5E9) : const Color(0xFF2E7D32).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isLight ? const Color(0xFF4CAF50) : const Color(0xFF81C784),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '보관함 저장완료 💾',
+                            style: GoogleFonts.notoSansKr(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: isLight ? const Color(0xFF2E7D32) : const Color(0xFFA5D6A7),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  LottoBallRow(numbers: _recentNumbers, ballSize: 46)
+                      .animate()
+                      .fadeIn(duration: 400.ms)
+                      .slideY(begin: 0.25, end: 0, duration: 400.ms, curve: Curves.easeOutBack),
+                  const SizedBox(height: 12),
+                  Text(
+                    '하단 보관함의 [추출번호] 탭에서 언제든지 다시 확인할 수 있습니다.',
+                    style: GoogleFonts.notoSansKr(
+                      fontSize: 11.5,
+                      color: AppColors.textHint,
+                    ),
+                  ),
+                ],
+              ),
+            ).animate().fadeIn(duration: 300.ms),
+            const SizedBox(height: 20),
+          ],
         ],
       ),
     );

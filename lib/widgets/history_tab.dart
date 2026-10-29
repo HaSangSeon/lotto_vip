@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_theme.dart';
 import '../services/history_service.dart';
 import '../services/dhlottery_api.dart';
+import '../services/notification_service.dart';
 import 'history/history_card.dart';
 import 'history/ticket_history_card.dart';
 import 'history/history_delete_dialog.dart';
@@ -30,6 +31,7 @@ class LottoRankInfo {
 }
 
 class HistoryTab extends StatefulWidget {
+  final bool? isLight;
   final List<LottoHistoryEntry> history;
   final VoidCallback onClear;
   final Function(LottoHistoryEntry)? onDeleteEntry;
@@ -37,6 +39,7 @@ class HistoryTab extends StatefulWidget {
 
   const HistoryTab({
     super.key,
+    this.isLight,
     required this.history,
     required this.onClear,
     this.onDeleteEntry,
@@ -55,7 +58,7 @@ class _HistoryTabState extends State<HistoryTab> {
   final Map<int, DHLotteryResult> _drawResultsCache = {};
   final Set<String> _collapsedTicketKeys = {};
 
-  int get _upcomingDrawNo => HistoryService.calculateTargetDrawNo(DateTime.now());
+  int get _upcomingDrawNo => HistoryService.calculateUpcomingDrawNo(DateTime.now());
 
   DateTime get _upcomingDrawDate {
     final firstDraw = DateTime(2002, 12, 7, 20, 45, 0);
@@ -83,8 +86,12 @@ class _HistoryTabState extends State<HistoryTab> {
           _drawResultsCache[res.drwNo] = res;
         });
         _preloadDrawResults();
+      } else {
+        _preloadDrawResults();
       }
-    } catch (_) {}
+    } catch (_) {
+      _preloadDrawResults();
+    }
   }
 
   @override
@@ -97,10 +104,10 @@ class _HistoryTabState extends State<HistoryTab> {
 
   Future<void> _preloadDrawResults() async {
     final Map<int, DHLotteryResult> newlyLoaded = {};
+    final maxCheckDraw = _latestDrawNo ?? (_upcomingDrawNo - 1);
     for (final entry in widget.history) {
       final drawNo = entry.drawNo;
-      if (_latestDrawNo != null &&
-          drawNo <= _latestDrawNo! &&
+      if (drawNo <= maxCheckDraw &&
           !_drawResultsCache.containsKey(drawNo) &&
           !newlyLoaded.containsKey(drawNo)) {
         final res = await DHLotteryApi.fetchByDrawNo(drawNo);
@@ -211,7 +218,12 @@ class _HistoryTabState extends State<HistoryTab> {
     HistoryDeleteDialog.showConfirmClearAll(
       context: context,
       historyCount: widget.history.length,
-      onConfirm: () => widget.onClear(),
+      onConfirm: () async {
+        widget.onClear();
+        try {
+          await NotificationService.scheduleWeeklyDrawNotification();
+        } catch (_) {}
+      },
     );
   }
 
@@ -251,6 +263,9 @@ class _HistoryTabState extends State<HistoryTab> {
 
   Future<void> _deleteEntry(LottoHistoryEntry entry) async {
     await HistoryService.delete(entry);
+    try {
+      await NotificationService.scheduleWeeklyDrawNotification();
+    } catch (_) {}
     if (widget.onDeleteEntry != null) {
       widget.onDeleteEntry!(entry);
     } else {
@@ -262,6 +277,8 @@ class _HistoryTabState extends State<HistoryTab> {
 
   @override
   Widget build(BuildContext context) {
+    // 테마 변경(ThemeData) 의존성 등록
+    final _ = widget.isLight ?? (Theme.of(context).brightness == Brightness.light);
     // 필터링된 항목 목록
     final displayedHistory = widget.history.where((entry) {
       if (_onlyFavorites && !entry.isFavorite) {
@@ -319,7 +336,7 @@ class _HistoryTabState extends State<HistoryTab> {
                     final entry = displayedHistory[index];
                     final targetResult = _getResultForEntry(entry);
                     final dismissKey =
-                        '${entry.createdAt.toIso8601String()}_${entry.title}_$index';
+                        '${entry.createdAt.millisecondsSinceEpoch}_${entry.title}';
 
                     // 1. 묶음 실물 복권(영수증)인 경우 전용 카드 렌더링
                     if (entry.isTicket) {
@@ -336,6 +353,13 @@ class _HistoryTabState extends State<HistoryTab> {
                           targetResult: targetResult,
                           isInitiallyCollapsed:
                               _collapsedTicketKeys.contains(dismissKey),
+                          onToggleCollapse: () {
+                            if (_collapsedTicketKeys.contains(dismissKey)) {
+                              _collapsedTicketKeys.remove(dismissKey);
+                            } else {
+                              _collapsedTicketKeys.add(dismissKey);
+                            }
+                          },
                           onToggleFavorite: () async {
                             setState(() => entry.isFavorite = !entry.isFavorite);
                             await HistoryService.updateAll(widget.history);
@@ -365,7 +389,7 @@ class _HistoryTabState extends State<HistoryTab> {
                         matchedNumbers: targetResult != null
                             ? rankInfo.matchedNumbers
                             : const {},
-                        bonusNumber: targetResult?.bonusNo,
+                        bonusNumber: (rankInfo.rank == 2) ? targetResult?.bonusNo : null,
                         onToggleFavorite: () async {
                           setState(() => entry.isFavorite = !entry.isFavorite);
                           await HistoryService.updateAll(widget.history);

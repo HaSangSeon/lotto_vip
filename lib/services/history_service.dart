@@ -6,6 +6,7 @@ enum LottoEntryType {
   dream, // 꿈해몽
   birthDate, // 생년월일
   customFilter, // 맞춤필터
+  diagnosis, // 황금밸런스 진단
   qrScan, // 실제 구매 복권 (QR 스캔)
 }
 
@@ -60,6 +61,8 @@ class LottoHistoryEntry {
       return LottoEntryType.dream;
     } else if (title.contains('생년월일') || title.contains('VIP') || title.contains('행운')) {
       return LottoEntryType.birthDate;
+    } else if (title.contains('진단') || title.contains('밸런스')) {
+      return LottoEntryType.diagnosis;
     } else {
       return LottoEntryType.customFilter;
     }
@@ -75,6 +78,8 @@ class LottoHistoryEntry {
         return '🌙 꿈해몽';
       case LottoEntryType.birthDate:
         return '🎂 생년월일';
+      case LottoEntryType.diagnosis:
+        return '🎯 밸런스진단';
       case LottoEntryType.customFilter:
         return '⚙️ 맞춤필터';
     }
@@ -182,7 +187,7 @@ class HistoryService {
     await prefs.remove(_key);
   }
 
-  /// 특정 일시(생성일 등) 기준 대상 로또 추첨 회차 계산
+  /// 특정 일시(생성일 등) 기준 판매 대상 로또 추첨 회차 계산
   /// 매주 토요일 20:00 이전 생성 -> 이번 주 토요일 추첨 회차
   /// 매주 토요일 20:00 이후 생성 -> 다음 주 토요일 추첨 회차
   static int calculateTargetDrawNo(DateTime dateTime) {
@@ -193,8 +198,11 @@ class HistoryService {
     if (daysUntilSaturday < 0) {
       daysUntilSaturday += 7;
     } else if (daysUntilSaturday == 0) {
-      if (dateTime.hour > 20 || (dateTime.hour == 20 && dateTime.minute > 0)) {
-        daysUntilSaturday = 7;
+      if (dateTime.hour > 20 || (dateTime.hour == 20 && dateTime.minute >= 0)) {
+        // 토요일 20:00 이후 판매 마감 -> 다음 회차
+        daysUntilSaturday = (dateTime.hour == 20 && dateTime.minute == 0 && dateTime.second == 0)
+            ? 0
+            : 7;
       }
     }
 
@@ -204,6 +212,34 @@ class HistoryService {
       dateTime.day + daysUntilSaturday,
       20,
       0,
+      0,
+    );
+    final diff = targetSaturday.difference(firstDrawSaturday);
+    return (diff.inDays / 7).round() + 1;
+  }
+
+  /// 보관함 상단 '이번 주 추첨 예정' 안내용 회차 계산 (추첨 발표 토요일 20:45 기준)
+  /// 토요일 20:00 판매가 마감되어도, 20:45 추첨 발표 전까지는 이번 주 회차가 유지됩니다.
+  static int calculateUpcomingDrawNo(DateTime dateTime) {
+    final firstDrawSaturday = DateTime(2002, 12, 7, 20, 45, 0);
+    if (dateTime.isBefore(firstDrawSaturday)) return 1;
+
+    int daysUntilSaturday = DateTime.saturday - dateTime.weekday;
+    if (daysUntilSaturday < 0) {
+      daysUntilSaturday += 7;
+    } else if (daysUntilSaturday == 0) {
+      final isDrawn = dateTime.hour > 20 || (dateTime.hour == 20 && dateTime.minute >= 45);
+      if (isDrawn) {
+        daysUntilSaturday = 7;
+      }
+    }
+
+    final targetSaturday = DateTime(
+      dateTime.year,
+      dateTime.month,
+      dateTime.day + daysUntilSaturday,
+      20,
+      45,
       0,
     );
     final diff = targetSaturday.difference(firstDrawSaturday);

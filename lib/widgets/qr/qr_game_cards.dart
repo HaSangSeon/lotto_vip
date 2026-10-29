@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../utils/safe_google_fonts.dart';
 import '../../theme/app_theme.dart';
 import '../../services/dhlottery_api.dart';
 import '../../services/qr_lottery_parser.dart';
@@ -61,12 +61,16 @@ class QrOfficialDrawCard extends StatelessWidget {
             children: [
               Icon(Icons.stars_rounded, color: AppColors.goldText, size: 16),
               const SizedBox(width: 6),
-              Text(
-                '제 ${res.drwNo}회 공식 당첨 번호',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+              Flexible(
+                child: Text(
+                  '제 ${res.drwNo}회 공식 당첨 번호',
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 6),
@@ -208,8 +212,14 @@ class QrGameCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              // 등수 및 일치 뱃지
-              QrRankBadge(eval: eval, isPending: isPending, isLight: isLight),
+              // 등수 및 일치 뱃지 (당첨금 포함)
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: QrRankBadge(eval: eval, isPending: isPending, isLight: isLight),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 10),

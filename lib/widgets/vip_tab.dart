@@ -11,6 +11,9 @@ import 'vip/shake_tab_view.dart';
 import 'custom_tab.dart';
 
 class VipTab extends StatefulWidget {
+  final bool? isLight;
+  final int initialIndex;
+  final ValueChanged<int>? onSubTabChanged;
   final TextEditingController ctrl;
   final List<int> vipNumbers;
   final VoidCallback onGenerate;
@@ -25,6 +28,9 @@ class VipTab extends StatefulWidget {
 
   const VipTab({
     super.key,
+    this.isLight,
+    this.initialIndex = 0,
+    this.onSubTabChanged,
     required this.ctrl,
     required this.vipNumbers,
     required this.onGenerate,
@@ -43,10 +49,18 @@ class VipTab extends StatefulWidget {
 }
 
 class _VipTabState extends State<VipTab> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialIndex;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isLight = widget.isLight ?? (Theme.of(context).brightness == Brightness.light);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
       child: Column(
@@ -56,12 +70,12 @@ class _VipTabState extends State<VipTab> {
             margin: const EdgeInsets.only(bottom: 16, top: 4),
             padding: const EdgeInsets.all(3.5),
             decoration: BoxDecoration(
-              color: AppColors.isLight
+              color: isLight
                   ? const Color(0xFFF0EAE0)
                   : const Color(0xFF10131C),
               borderRadius: BorderRadius.circular(13),
               border: Border.all(
-                color: AppColors.isLight
+                color: isLight
                     ? const Color(0xFFE2D6C3)
                     : Colors.white.withValues(alpha: 0.08),
                 width: 0.9,
@@ -73,25 +87,25 @@ class _VipTabState extends State<VipTab> {
                   index: 0,
                   label: '흔들기',
                   icon: Icons.vibration_rounded,
-                  isLight: AppColors.isLight,
+                  isLight: isLight,
                 ),
                 _buildTabSegmentItem(
                   index: 1,
                   label: '꿈 해몽',
                   icon: Icons.nights_stay_rounded,
-                  isLight: AppColors.isLight,
+                  isLight: isLight,
                 ),
                 _buildTabSegmentItem(
                   index: 2,
                   label: '생년월일',
                   icon: Icons.cake_rounded,
-                  isLight: AppColors.isLight,
+                  isLight: isLight,
                 ),
                 _buildTabSegmentItem(
                   index: 3,
                   label: '맞춤 필터',
                   icon: Icons.tune_rounded,
-                  isLight: AppColors.isLight,
+                  isLight: isLight,
                 ),
               ],
             ),
@@ -99,11 +113,18 @@ class _VipTabState extends State<VipTab> {
           
           Expanded(
             child: _selectedIndex == 0
-                ? ShakeTabView(onShowResult: widget.onShowDreamResult)
+                ? ShakeTabView(
+                    isLight: isLight,
+                    onShowResult: widget.onShowDreamResult,
+                  )
                 : _selectedIndex == 1
-                    ? DreamTabView(onShowResult: widget.onShowDreamResult)
+                    ? DreamTabView(
+                        isLight: isLight,
+                        onShowResult: widget.onShowDreamResult,
+                      )
                     : _selectedIndex == 3
                         ? CustomTab(
+                            isLight: isLight,
                             customNumbers: widget.customNumbers,
                             includeNumbers: widget.includeNumbers,
                             excludeNumbers: widget.excludeNumbers,
@@ -116,13 +137,13 @@ class _VipTabState extends State<VipTab> {
                           children: [
                             // VIP 카드
                             GlassCard(
-            gradientColors: AppColors.isLight
+            gradientColors: isLight
                 ? const [Color(0xFFFFFEFA), Color(0xFFFFF8E0)]
                 : const [Color(0xFF1E1800), Color(0xFF0F0D00)],
-            borderColor: AppColors.isLight
+            borderColor: isLight
                 ? AppColors.lightGoldBorder.withValues(alpha: 0.45)
                 : AppColors.borderGold,
-            shadows: AppColors.isLight
+            shadows: isLight
                 ? [
                     BoxShadow(
                       color: AppColors.goldDark.withValues(alpha: 0.12),
@@ -157,12 +178,12 @@ class _VipTabState extends State<VipTab> {
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        AppColors.gold.withValues(alpha: AppColors.isLight ? 0.22 : 0.25),
+                        AppColors.gold.withValues(alpha: isLight ? 0.22 : 0.25),
                         Colors.transparent,
                       ],
                     ),
                     border: Border.all(
-                      color: AppColors.isLight
+                      color: isLight
                           ? AppColors.lightGoldBorder.withValues(alpha: 0.5)
                           : AppColors.gold.withValues(alpha: 0.4),
                       width: 1.5,
@@ -174,13 +195,13 @@ class _VipTabState extends State<VipTab> {
                       height: 54,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: AppColors.isLight
+                        color: isLight
                             ? const Color(0xFFFFF7E6)
                             : AppColors.gold.withValues(alpha: 0.15),
                       ),
                       child: Icon(
                         Icons.auto_awesome_rounded,
-                        color: AppColors.isLight ? AppColors.goldDeep : AppColors.gold,
+                        color: isLight ? AppColors.goldDeep : AppColors.gold,
                         size: 32,
                       ),
                     ),
@@ -214,12 +235,12 @@ class _VipTabState extends State<VipTab> {
                 // 입력 필드
                 Container(
                   decoration: BoxDecoration(
-                    color: AppColors.isLight
+                    color: isLight
                         ? Colors.white
                         : Colors.white.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: AppColors.isLight
+                      color: isLight
                           ? const Color(0xFFD4A017).withValues(alpha: 0.35)
                           : AppColors.borderGold,
                       width: 1.0,
@@ -264,7 +285,7 @@ class _VipTabState extends State<VipTab> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                             decoration: BoxDecoration(
-                              color: AppColors.isLight
+                              color: isLight
                                   ? const Color(0xFFF0EBE1)
                                   : Colors.white.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(6),
@@ -289,7 +310,7 @@ class _VipTabState extends State<VipTab> {
                 // 생성 버튼
                 SizedBox(
                   width: double.infinity,
-                  child: AppColors.isLight
+                  child: isLight
                       ? Container(
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
@@ -312,9 +333,13 @@ class _VipTabState extends State<VipTab> {
                               widget.onGenerate();
                             },
                             icon: const Icon(Icons.auto_awesome_rounded, size: 20, color: Colors.white),
-                            label: Text(
-                              '오늘 나의 행운 번호 추출하기',
-                              style: GoogleFonts.notoSansKr(fontWeight: FontWeight.w700, fontSize: 16, color: Colors.white),
+                            label: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '오늘 나의 행운 번호 추출하기',
+                                maxLines: 1,
+                                style: GoogleFonts.notoSansKr(fontWeight: FontWeight.w700, fontSize: 16, color: Colors.white),
+                              ),
                             ),
                             style: ElevatedButton.styleFrom(
                               minimumSize: const Size(double.infinity, 56),
@@ -332,9 +357,13 @@ class _VipTabState extends State<VipTab> {
                             widget.onGenerate();
                           },
                           icon: const Icon(Icons.auto_awesome_rounded, size: 20),
-                          label: Text(
-                            '오늘 나의 행운 번호 추출하기',
-                            style: GoogleFonts.notoSansKr(fontWeight: FontWeight.w700, fontSize: 16),
+                          label: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '오늘 나의 행운 번호 추출하기',
+                              maxLines: 1,
+                              style: GoogleFonts.notoSansKr(fontWeight: FontWeight.w700, fontSize: 16),
+                            ),
                           ),
                           style: ElevatedButton.styleFrom(
                             minimumSize: const Size(double.infinity, 56),
@@ -355,7 +384,7 @@ class _VipTabState extends State<VipTab> {
           // 결과 카드
           if (widget.vipNumbers.isNotEmpty)
             GlassCard(
-              gradientColors: AppColors.isLight
+              gradientColors: isLight
                   ? const [Color(0xFFFFFDF5), Color(0xFFFFF8E5)]
                   : const [Color(0xFF1A1800), Color(0xFF0D0B00)],
               borderColor: AppColors.borderGold,
@@ -366,12 +395,16 @@ class _VipTabState extends State<VipTab> {
                     children: [
                       Icon(Icons.stars, color: AppColors.goldText, size: 18),
                       const SizedBox(width: 6),
-                      Text(
-                        '오늘 뽑은 행운 번호',
-                        style: GoogleFonts.notoSansKr(
-                          color: AppColors.goldText,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
+                      Flexible(
+                        child: Text(
+                          '오늘 뽑은 행운 번호',
+                          style: GoogleFonts.notoSansKr(
+                            color: AppColors.goldText,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -391,12 +424,12 @@ class _VipTabState extends State<VipTab> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
             decoration: BoxDecoration(
-              color: AppColors.isLight
+              color: isLight
                   ? const Color(0xFFFAF6EE)
                   : Colors.white.withValues(alpha: 0.04),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: AppColors.isLight
+                color: isLight
                     ? const Color(0xFFE8DCC8)
                     : Colors.white.withValues(alpha: 0.08),
                 width: 0.8,
@@ -406,13 +439,13 @@ class _VipTabState extends State<VipTab> {
               children: [
                 Icon(
                   Icons.lightbulb_rounded,
-                  color: AppColors.isLight ? AppColors.goldDeep : AppColors.gold,
+                  color: isLight ? AppColors.goldDeep : AppColors.gold,
                   size: 19,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    '생년월일은 기기에 안전하게 암호화 보관되며, 매일 접속 시 오늘의 새로운 행운 번호가 자동으로 분석됩니다.',
+                    '생년월일 정보는 외부 서버 전송 없이 기기에 안전하게 보관되며, 매일 오늘의 새로운 행운 번호를 분석해 드립니다.',
                     style: GoogleFonts.notoSansKr(
                       color: AppColors.textSecondary,
                       fontSize: 12,
@@ -452,6 +485,7 @@ class _VipTabState extends State<VipTab> {
           if (!isSelected) {
             HapticFeedback.selectionClick();
             setState(() => _selectedIndex = index);
+            widget.onSubTabChanged?.call(index);
           }
         },
         child: AnimatedContainer(

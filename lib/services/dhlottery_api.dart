@@ -133,24 +133,29 @@ class DHLotteryApi {
   static const String _cacheKey = 'dh_lottery_cached_result';
 
   static DHLotteryResult? _memoryCachedResult;
+  static DHLotteryResult? get cachedResult => _memoryCachedResult;
   static final Map<int, DHLotteryResult> _drawCache = {};
 
-  /// 오늘 날짜 기준으로 대략적인 최신 회차를 계산
+  /// 오늘 날짜 기준으로 대략적인 최신 회차를 계산 (토요일 20:35 추첨 방송 기준)
   static int _calculateLatestDrawNo() {
-    final firstDraw = DateTime(2002, 12, 7, 21, 0, 0); // 1회차 추첨일
-    final now = DateTime.now();
-    final diff = now.difference(firstDraw);
-    return (diff.inDays / 7).floor() + 1;
+    // 1회차: 2002-12-07 20:35:00 KST
+    final firstDrawKst = DateTime.utc(2002, 12, 7, 11, 35, 0); // UTC 11:35 = KST 20:35
+    final nowUtc = DateTime.now().toUtc();
+    final diff = nowUtc.difference(firstDrawKst);
+    if (diff.isNegative) return 1;
+    return (diff.inSeconds / (7 * 86400)).floor() + 1;
   }
 
   /// 최신 당첨 번호 가져오기 (네트워크 실패 시 로컬 캐시 자동 제공)
   static Future<DHLotteryResult?> fetchLatest() async {
     int guessNo = _calculateLatestDrawNo();
 
-    // 최신 회차부터 최대 3회차 이전까지 시도
-    for (int i = 0; i < 3; i++) {
-      final res = await fetchByDrawNo(guessNo - i);
-      if (res != null) {
+    // 토요일 20:35 직후 등 신규 회차가 등록되었을 수 있으므로 guessNo + 1부터 시도
+    for (int offset = 1; offset >= -2; offset--) {
+      final targetNo = guessNo + offset;
+      if (targetNo < 1) continue;
+      final res = await fetchByDrawNo(targetNo);
+      if (res != null && res.numbers.length == 6) {
         _memoryCachedResult = res;
         _saveToLocalCache(res);
         return res;
@@ -163,20 +168,26 @@ class DHLotteryApi {
 
   /// 특정 회차 당첨 번호 및 상세 데이터 가져오기 (메모리 & 영구 로컬 캐시 적용)
   static Future<DHLotteryResult?> fetchByDrawNo(int drwNo) async {
-    // 1. 메모리 캐시 확인
+    // 1. 메모리 캐시 확인 (단, 당첨금 집계가 완료된 건만 유효)
     if (_drawCache.containsKey(drwNo)) {
-      return _drawCache[drwNo];
+      final mem = _drawCache[drwNo]!;
+      if (_isDrawResultCompleted(mem)) {
+        return mem;
+      }
     }
 
-    // 2. 영구 디스크 캐시(SharedPreferences) 확인 (오프라인 상태에서도 즉시 로드)
+    // 2. 영구 디스크 캐시(SharedPreferences) 확인
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedRaw = prefs.getString('draw_result_$drwNo');
       if (cachedRaw != null && cachedRaw.isNotEmpty) {
         final Map<String, dynamic> json = jsonDecode(cachedRaw);
         final result = DHLotteryResult.fromJson(json);
-        _drawCache[drwNo] = result;
-        return result;
+        // 당첨금 집계가 완전히 끝난 데이터만 캐시로 인정 (미집계 0원 데이터 캐싱 방지)
+        if (_isDrawResultCompleted(result)) {
+          _drawCache[drwNo] = result;
+          return result;
+        }
       }
     } catch (_) {}
 
@@ -191,10 +202,17 @@ class DHLotteryApi {
         final List<dynamic>? list = body['data']?['list'];
         if (list != null && list.isNotEmpty) {
           final result = DHLotteryResult.fromJson(Map<String, dynamic>.from(list[0]));
+          // 추첨 번호 6개와 보너스 번호가 모두 1~45 범위의 유효한 숫자인지 검증 ([0,0,0,0,0,0] 미추첨 데이터 방어)
+          if (!_hasValidWinningNumbers(result)) {
+            return null;
+          }
+
           _drawCache[drwNo] = result;
 
-          // 과거 회차 결과는 불변이므로 기기에 영구 저장
-          _saveDrawToDiskCache(drwNo, result);
+          // 당첨금 및 당첨자 수 집계가 완전히 완료된 데이터만 영구 캐싱
+          if (_isDrawResultCompleted(result)) {
+            _saveDrawToDiskCache(drwNo, result);
+          }
           return result;
         }
       }
@@ -202,9 +220,30 @@ class DHLotteryApi {
     return null;
   }
 
+  /// 당첨 번호 6개 및 보너스 번호가 모두 유효한 범위(1~45)인지 검증
+  static bool _hasValidWinningNumbers(DHLotteryResult r) {
+    if (r.numbers.length != 6) return false;
+    if (r.bonusNo < 1 || r.bonusNo > 45) return false;
+    return r.numbers.every((n) => n >= 1 && n <= 45);
+  }
+
+  /// 당첨금 및 당첨자 집계가 정상 완료된 데이터인지 판별 (미집계 0원 박제 방지)
+  static bool _isDrawResultCompleted(DHLotteryResult r) {
+    if (!_hasValidWinningNumbers(r)) return false;
+    // 1등 당첨금이 있거나, 총판매금액이 집계되었거나, 2등/5등 당첨자수가 집계된 경우
+    if (r.firstSumWinamnt > 0 || r.firstWinamnt > 0 || r.totalSalesAmount > 0) {
+      return true;
+    }
+    // 이월된 경우(firstWinCount == 0)라도 totalSalesAmount나 2등 인원이 있으면 완료
+    if (r.firstWinCount == 0 && (r.rank2Count > 0 || r.rank5Count > 0)) {
+      return true;
+    }
+    return false;
+  }
+
   static Future<void> _saveDrawToDiskCache(int drwNo, DHLotteryResult result) async {
     try {
-      if (result.numbers.length == 6) {
+      if (result.numbers.length == 6 && _isDrawResultCompleted(result)) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('draw_result_$drwNo', jsonEncode(result.toJson()));
       }
@@ -213,39 +252,45 @@ class DHLotteryApi {
 
   static Future<void> _saveToLocalCache(DHLotteryResult result) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_cacheKey, jsonEncode(result.toJson()));
+      if (_isDrawResultCompleted(result)) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_cacheKey, jsonEncode(result.toJson()));
+      }
     } catch (_) {}
   }
 
   static Future<DHLotteryResult?> _loadFromLocalCache() async {
-    if (_memoryCachedResult != null) return _memoryCachedResult;
+    if (_memoryCachedResult != null && _isDrawResultCompleted(_memoryCachedResult!)) {
+      return _memoryCachedResult;
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_cacheKey);
       if (raw != null && raw.isNotEmpty) {
         final Map<String, dynamic> json = jsonDecode(raw);
-        _memoryCachedResult = DHLotteryResult.fromJson(json);
-        if (_memoryCachedResult != null) {
-          _drawCache[_memoryCachedResult!.drwNo] = _memoryCachedResult!;
+        final res = DHLotteryResult.fromJson(json);
+        if (_isDrawResultCompleted(res)) {
+          _memoryCachedResult = res;
+          _drawCache[res.drwNo] = res;
+          return res;
         }
-        return _memoryCachedResult;
       }
     } catch (_) {}
     return null;
   }
 
-  static final Map<int, List<DHLotteryWinningStore>> _storeMemoryCache = {};
+  static final Map<String, List<DHLotteryWinningStore>> _storeMemoryCache = {};
 
-  /// 특정 회차의 1등 당첨 판매점 목록 조회 API (메모리 & 영구 로컬 캐시 적용)
+  /// 특정 회차의 당첨 판매점 목록 조회 API (rank 1: 1등, rank 2: 2등)
   static Future<List<DHLotteryWinningStore>> fetchWinningStores(int drwNo, {int rank = 1}) async {
-    // 1. 메모리 캐시 확인 (즉시 반환)
-    if (_storeMemoryCache.containsKey(drwNo) && _storeMemoryCache[drwNo]!.isNotEmpty) {
-      return _storeMemoryCache[drwNo]!;
+    final cacheKey = 'winning_stores_${drwNo}_$rank';
+
+    // 1. 메모리 캐시 확인 (rank 구분된 고유 키)
+    if (_storeMemoryCache.containsKey(cacheKey) && _storeMemoryCache[cacheKey]!.isNotEmpty) {
+      return _storeMemoryCache[cacheKey]!;
     }
 
-    // 2. 로컬 디스크 캐시(SharedPreferences) 확인 (오프라인/서버 점검 시에도 즉시 로딩)
-    final cacheKey = 'winning_stores_${drwNo}_$rank';
+    // 2. 로컬 디스크 캐시(SharedPreferences) 확인
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedRaw = prefs.getString(cacheKey);
@@ -255,7 +300,7 @@ class DHLotteryApi {
             .map((e) => DHLotteryWinningStore.fromJson(Map<String, dynamic>.from(e)))
             .toList();
         if (cachedList.isNotEmpty) {
-          _storeMemoryCache[drwNo] = cachedList;
+          _storeMemoryCache[cacheKey] = cachedList;
           return cachedList;
         }
       }
@@ -279,9 +324,9 @@ class DHLotteryApi {
               .map((item) => DHLotteryWinningStore.fromJson(Map<String, dynamic>.from(item)))
               .toList();
 
-          _storeMemoryCache[drwNo] = resultList;
+          _storeMemoryCache[cacheKey] = resultList;
 
-          // 과거 회차는 데이터가 영구적이므로 기기에 영구 캐싱 저장
+          // 판매점 목록 영구 캐싱 저장
           try {
             final prefs = await SharedPreferences.getInstance();
             final rawJson = jsonEncode(resultList.map((e) => e.toJson()).toList());
@@ -321,12 +366,15 @@ class DHLotteryWinningStore {
     final rawAddr = (json['shpAddr'] ?? '').toString();
     final cleanAddr = rawAddr.replaceAll(RegExp(r'\s+'), ' ').trim();
 
+    final rawType = (json['atmtPsvYnTxt'] ?? '').toString().trim();
+    final winTypeStr = rawType.isNotEmpty ? rawType : (json['wnShpRnk'] == 1 ? '구분없음' : '-');
+
     return DHLotteryWinningStore(
       rank: json['wnShpRnk'] is int ? json['wnShpRnk'] : 1,
       name: (json['shpNm'] ?? '복권판매점').toString().trim(),
       address: cleanAddr.isNotEmpty ? cleanAddr : '주소 정보 없음',
       region: (json['region'] ?? '').toString().trim(),
-      winType: (json['atmtPsvYnTxt'] ?? '자동').toString().trim(),
+      winType: winTypeStr,
       phone: json['shpTelno']?.toString(),
       lat: (json['shpLat'] is num) ? (json['shpLat'] as num).toDouble() : null,
       lng: (json['shpLot'] is num) ? (json['shpLot'] as num).toDouble() : null,

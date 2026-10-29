@@ -187,9 +187,8 @@ class NotificationService {
     final int variant = drawNo % 3;
 
     if (registeredTickets.isNotEmpty) {
-      final ticket = registeredTickets.first;
       final totalGames = registeredTickets.fold(0, (sum, t) => sum + t.gameCount);
-      final targetDrawNo = ticket.drawNo;
+      final targetDrawNo = drawNo;
       final payload = isTest ? 'test_notification:$targetDrawNo' : 'lotto_draw_result:$targetDrawNo';
 
       String title;
@@ -241,7 +240,7 @@ class NotificationService {
       // 보관함에서 이번 회차 또는 미추첨 등록 번호(실물 복권 및 생성 번호 모두 포함) 확인
       final upcomingDrawNo = getUpcomingDrawNo();
       final history = await HistoryService.load();
-      final registeredTickets = history.where((e) => e.drawNo >= upcomingDrawNo).toList();
+      final registeredTickets = history.where((e) => e.drawNo == upcomingDrawNo).toList();
 
       final content = _getDrawNotificationContent(
         drawNo: upcomingDrawNo,
@@ -340,7 +339,7 @@ class NotificationService {
 
       final upcomingDrawNo = getUpcomingDrawNo();
       final history = await HistoryService.load();
-      final registeredTickets = history.where((e) => e.drawNo >= upcomingDrawNo).toList();
+      final registeredTickets = history.where((e) => e.drawNo == upcomingDrawNo).toList();
 
       final content = _getDrawNotificationContent(
         drawNo: upcomingDrawNo,
@@ -396,7 +395,7 @@ class NotificationService {
 
       final upcomingDrawNo = getUpcomingDrawNo();
       final history = await HistoryService.load();
-      final registeredTickets = history.where((e) => e.drawNo >= upcomingDrawNo).toList();
+      final registeredTickets = history.where((e) => e.drawNo == upcomingDrawNo).toList();
 
       final content = _getDrawNotificationContent(
         drawNo: upcomingDrawNo,

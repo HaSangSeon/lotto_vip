@@ -122,6 +122,7 @@ class _HomeScreenState extends State<HomeScreen>
   late AnimationController _pulseCtrl;
 
   int _selectedTab = 0;
+  int _vipSubTabIndex = 0;
 
   @override
   void initState() {
@@ -410,10 +411,19 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  bool _isValidBirthDate(String val) {
+    if (val.length != 6) return false;
+    final month = int.tryParse(val.substring(2, 4)) ?? 0;
+    final day = int.tryParse(val.substring(4, 6)) ?? 0;
+    if (month < 1 || month > 12) return false;
+    if (day < 1 || day > 31) return false;
+    return true;
+  }
+
   Future<void> _generateVipNumbers() async {
     FocusScope.of(context).unfocus();
-    if (_birthDateCtrl.text.length < 6) {
-      _showToast('생년월일 6자리를 입력해주세요.');
+    if (!_isValidBirthDate(_birthDateCtrl.text)) {
+      _showToast('올바른 생년월일 6자리를 입력해주세요 (예: 900101)');
       return;
     }
     _saveBirthDate(_birthDateCtrl.text);
@@ -436,13 +446,16 @@ class _HomeScreenState extends State<HomeScreen>
       prefs.setStringList('last_vip_numbers', result.map((e) => e.toString()).toList());
     });
 
-    // 이미 보관함에 동일한 번호 조합이 있는지 확인하여 중복 저장 방지
+    final upcomingDrawNo = HistoryService.calculateTargetDrawNo(DateTime.now());
+
+    // 이번 회차에 동일한 단일 생성 번호 조합이 이미 있는지 확인하여 중복 저장 방지
     final isAlreadySaved = _history.any((entry) =>
+        entry.drawNo == upcomingDrawNo &&
+        !entry.isTicket &&
         entry.numbers.length == result.length &&
         entry.numbers.every((n) => result.contains(n)));
 
     if (!isAlreadySaved) {
-      final upcomingDrawNo = HistoryService.calculateTargetDrawNo(DateTime.now());
       final entry = LottoHistoryEntry(
         title: '제$upcomingDrawNo회 생년월일 행운 번호',
         numbers: result,
@@ -543,6 +556,7 @@ class _HomeScreenState extends State<HomeScreen>
           setState(() {
             _includeNumbers = inc;
             _excludeNumbers = exc;
+            _customNumbers = []; // 필터 변경 시 이전 생성 결과 초기화
           });
           _saveCustomFilters(inc, exc);
         },
@@ -600,7 +614,7 @@ class _HomeScreenState extends State<HomeScreen>
                       Expanded(
                         child: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 300),
-                          child: _buildTabContent(),
+                          child: _buildTabContent(isLight),
                         ),
                       ),
                     ],
@@ -634,16 +648,20 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildTabContent() {
-    final mode = AppTheme.themeModeNotifier.value;
+  Widget _buildTabContent(bool isLight) {
+    final modeKey = isLight ? 'light' : 'dark';
     switch (_selectedTab) {
       case 0:
         return LatestDrawTab(
-          key: ValueKey('latest_$mode'),
+          key: ValueKey('tab_latest_draw_$modeKey'),
+          isLight: isLight,
         );
       case 1:
         return VipTab(
-          key: ValueKey('vip_$mode'),
+          key: ValueKey('tab_vip_extract_$modeKey'),
+          isLight: isLight,
+          initialIndex: _vipSubTabIndex,
+          onSubTabChanged: (idx) => _vipSubTabIndex = idx,
           ctrl: _birthDateCtrl,
           vipNumbers: _vipNumbers,
           onGenerate: _generateVipNumbers,
@@ -658,14 +676,19 @@ class _HomeScreenState extends State<HomeScreen>
         );
       case 2:
         return StatisticsTab(
-          key: ValueKey('stat_$mode'),
+          key: ValueKey('tab_statistics_$modeKey'),
+          isLight: isLight,
         );
       default:
         return HistoryTab(
-          key: ValueKey('history_$mode'),
+          key: ValueKey('tab_history_$modeKey'),
+          isLight: isLight,
           history: _history,
           onClear: () async {
             await HistoryService.clear();
+            try {
+              await NotificationService.scheduleWeeklyDrawNotification();
+            } catch (_) {}
             await _loadHistory();
           },
           onDeleteEntry: (entry) async {

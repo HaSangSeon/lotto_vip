@@ -1,3 +1,5 @@
+import 'dart:math';
+
 class QRLotteryGame {
   final String label; // A, B, C, D, E
   final List<int> numbers; // 6 numbers
@@ -61,18 +63,19 @@ class QRLotteryParseResult {
 }
 
 class QRLotteryParser {
-  /// 현재 시점 기준 예상 최신 회차 번호 계산
+  /// 현재 시점 기준 예상 최신 회차 번호 계산 (기기 시간 오차 방어 포함)
   static int calculateMaxPossibleDrawNo() {
     final firstDraw = DateTime(2002, 12, 7, 21, 0, 0);
     final diff = DateTime.now().difference(firstDraw);
     final currentDraw = (diff.inDays / 7).floor() + 1;
-    return currentDraw + 2; // 최대 2회차 미래까지 구매 가능 여유
+    // 기기 시스템 시간이 잘못 설정된 경우에도 정상 복권이 거부되지 않도록 최소 기준선 및 여유분 확보
+    return max(currentDraw + 5, 1300);
   }
 
   /// 동행복권 QR URL 또는 v 파라미터를 정밀하게 파싱하고 유효성을 검증합니다.
   static QRLotteryParseResult parseDetailed(String input) {
     try {
-      final rawInput = input.trim();
+      String rawInput = input.trim();
       if (rawInput.isEmpty) {
         return const QRLotteryParseResult.failure(
           QRErrorType.invalidFormat,
@@ -80,8 +83,21 @@ class QRLotteryParser {
         );
       }
 
-      // 연금복권 등 다른 복권인 경우 감지 (예: 720+, 520 등)
-      if (rawInput.contains('720') || rawInput.contains('pension') || rawInput.contains('pr.do')) {
+      // URL 인코딩이 포함된 경우 안전하게 디코딩
+      try {
+        if (rawInput.contains('%')) {
+          rawInput = Uri.decodeFull(rawInput).trim();
+        }
+      } catch (_) {}
+
+      final lowerInput = rawInput.toLowerCase();
+
+      // 연금복권 전용 URL 경로/식별자인 경우 감지
+      // (주의: 로또 번호 조합 '07','20'이나 일련번호에 '720'이 포함될 수 있으므로 단순 '720' 문자열 포함 검사는 절대 금지)
+      if (lowerInput.contains('pension') ||
+          lowerInput.contains('pr.do') ||
+          lowerInput.contains('lp720') ||
+          lowerInput.contains('win720')) {
         return const QRLotteryParseResult.failure(
           QRErrorType.pensionLottery,
           '연금복권 QR 코드입니다. 로또 6/45 용지의 QR 코드를 스캔해 주세요.',
@@ -89,22 +105,27 @@ class QRLotteryParser {
       }
 
       String rawV = '';
-      if (rawInput.contains('v=')) {
-        final uri = Uri.tryParse(rawInput);
-        if (uri != null && uri.queryParameters.containsKey('v')) {
-          rawV = uri.queryParameters['v'] ?? '';
-        } else {
-          final vIndex = rawInput.indexOf('v=');
-          rawV = rawInput.substring(vIndex + 2).split('&').first;
-        }
+      final vParamMatch = RegExp(r'[?&]v=([^&\s#]+)', caseSensitive: false).firstMatch(rawInput);
+      if (vParamMatch != null) {
+        rawV = vParamMatch.group(1) ?? '';
+      } else if (lowerInput.contains('v=')) {
+        final vIndex = lowerInput.indexOf('v=');
+        rawV = rawInput.substring(vIndex + 2).split(RegExp(r'[&\s#]')).first;
       } else {
-        rawV = rawInput;
+        // URL 없이 v 값만 입력했거나 전체 문자열 속에 포함된 경우
+        final directMatch = RegExp(r'(\d{3,5}[qmsQMS][0-9qmsnQMSN]+)').firstMatch(rawInput);
+        if (directMatch != null) {
+          rawV = directMatch.group(1)!;
+        } else {
+          rawV = rawInput.split(RegExp(r'\s+')).first;
+        }
       }
 
       rawV = rawV.trim();
 
-      // 회차 번호 추출 (앞부분 3~5자리 숫자)
-      final drwMatch = RegExp(r'^(\d{3,5})').firstMatch(rawV);
+      // 회차 번호 추출 (앞부분 3~5자리 숫자 + 영문 구분자)
+      final drwMatch = RegExp(r'^(\d{3,5})(?=[a-zA-Z])').firstMatch(rawV) ??
+          RegExp(r'^(\d{3,5})').firstMatch(rawV);
       if (drwMatch == null) {
         return const QRLotteryParseResult.failure(
           QRErrorType.invalidFormat,
@@ -124,16 +145,19 @@ class QRLotteryParser {
       if (drwNo > maxDraw) {
         return QRLotteryParseResult.failure(
           QRErrorType.invalidDrawNo,
-          '회차 번호($drwNo회)가 현재 진행 중인 회차보다 너무 큽니다.',
+          '회차 번호($drwNo회)가 유효 범위를 벗어났습니다.\n로또 6/45 QR 코드인지 확인해 주세요.',
         );
       }
 
       final rest = rawV.substring(drwMatch.group(1)!.length);
       final List<QRLotteryGame> games = [];
-      final labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+      const labels = ['A', 'B', 'C', 'D', 'E'];
 
-      // q 또는 기타 영문자로 구분된 게임 토큰 분리
-      final gameTokens = rest.split(RegExp(r'[a-zA-Z]')).where((s) => s.isNotEmpty).toList();
+      // q(자동), m(수동), s(반자동), n(빈게임) 또는 기타 영문자로 구분된 게임 토큰 분리
+      final gameTokens = rest
+          .split(RegExp(r'[a-zA-Z]+'))
+          .where((s) => s.isNotEmpty)
+          .toList();
 
       if (gameTokens.isEmpty) {
         return const QRLotteryParseResult.failure(
@@ -143,10 +167,16 @@ class QRLotteryParser {
       }
 
       for (int i = 0; i < gameTokens.length; i++) {
+        // 로또 6/45 용지는 한 장당 최대 5게임(A~E)까지만 존재
+        if (games.length >= 5) break;
+
         final token = gameTokens[i];
         if (token.length < 12) continue;
 
         final numPart = token.substring(0, 12);
+        // 빈 슬롯(000000000000)은 건너뜀
+        if (numPart == '000000000000') continue;
+
         final List<int> nums = [];
         bool valid = true;
 
@@ -161,29 +191,37 @@ class QRLotteryParser {
 
         if (valid && nums.length == 6) {
           nums.sort();
-          final label = i < labels.length ? labels[i] : '${i + 1}';
+          final label = games.length < labels.length
+              ? labels[games.length]
+              : '${games.length + 1}';
           games.add(QRLotteryGame(label: label, numbers: nums));
         }
       }
 
       if (games.isEmpty) {
+        // 만약 v= 파라미터는 있었지만 유효한 1~45 번호 6개가 하나도 없다면 연금복권 등 타 복권일 가능성 안내
         return const QRLotteryParseResult.failure(
           QRErrorType.invalidNumbers,
-          '올바른 6개 번호 조합을 추출할 수 없습니다.',
+          '로또 6/45 번호(1~45)를 추출할 수 없습니다.\n연금복권이 아닌 로또 6/45 용지의 QR 코드인지 확인해 주세요.',
         );
       }
+
+      // 공식 웹 연결을 위한 정규화된 URL 보장
+      final normalizedUrl = (rawInput.startsWith('http://') || rawInput.startsWith('https://'))
+          ? rawInput
+          : 'https://m.dhlottery.co.kr/qr.do?method=winQr&v=$rawV';
 
       return QRLotteryParseResult.success(
         QRLotteryData(
           drwNo: drwNo,
           games: games,
-          rawUrl: rawInput,
+          rawUrl: normalizedUrl,
         ),
       );
     } catch (e) {
-      return QRLotteryParseResult.failure(
+      return const QRLotteryParseResult.failure(
         QRErrorType.invalidFormat,
-        'QR 코드 분석 중 알 수 없는 오류가 발생했습니다.',
+        'QR 코드 분석 중 오류가 발생했습니다.\n다시 스캔해 주세요.',
       );
     }
   }

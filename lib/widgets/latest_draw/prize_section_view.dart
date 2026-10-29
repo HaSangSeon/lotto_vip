@@ -249,9 +249,11 @@ class PrizeSectionView extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              firstTax.originalAmount >= 100000000
-                                  ? '세금 약 $firstTaxBillion억 공제 (33%)'
-                                  : '세금 ${fmt.format(firstTax.taxAmount)} 공제',
+                              firstTax.originalAmount > 300000000
+                                  ? '세금 약 $firstTaxBillion억 공제 (33% 누진)'
+                                  : (firstTax.taxAmount >= 100000000
+                                      ? '세금 약 $firstTaxBillion억 공제 (22%)'
+                                      : '세금 ${fmt.format(firstTax.taxAmount)} 공제 (22%)'),
                               style: GoogleFonts.notoSansKr(
                                 fontSize: 10.5,
                                 color: AppColors.textHint,
@@ -417,19 +419,26 @@ class PrizeSectionView extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const SizedBox(width: 8),
                   const Spacer(),
                   if (hasTypeData)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildMiniTypeBadge('자동', result.winTypeAuto, const Color(0xFF1976D2)),
-                        const SizedBox(width: 6),
-                        _buildMiniTypeBadge('수동', result.winTypeManual, const Color(0xFF2E7D32)),
-                        if (result.winTypeSemi > 0) ...[
-                          const SizedBox(width: 6),
-                          _buildMiniTypeBadge('반자동', result.winTypeSemi, const Color(0xFF7B1FA2)),
-                        ],
-                      ],
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildMiniTypeBadge('자동', result.winTypeAuto, const Color(0xFF1976D2)),
+                            const SizedBox(width: 6),
+                            _buildMiniTypeBadge('수동', result.winTypeManual, const Color(0xFF2E7D32)),
+                            if (result.winTypeSemi > 0) ...[
+                              const SizedBox(width: 6),
+                              _buildMiniTypeBadge('반자동', result.winTypeSemi, const Color(0xFF7B1FA2)),
+                            ],
+                          ],
+                        ),
+                      ),
                     )
                   else
                     Text(

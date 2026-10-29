@@ -185,12 +185,16 @@ class _NotificationSettingsDialogState
                       children: [
                         Row(
                           children: [
-                            Text(
-                              '토요일 추첨 결과 알림',
-                              style: GoogleFonts.notoSansKr(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
+                            Flexible(
+                              child: Text(
+                                '토요일 추첨 결과 알림',
+                                style: GoogleFonts.notoSansKr(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             const SizedBox(width: 6),
@@ -343,11 +347,14 @@ class _NotificationSettingsDialogState
             OutlinedButton.icon(
               onPressed: _sendTestDelayedNotification,
               icon: const Icon(Icons.timer_outlined, size: 16),
-              label: Text(
-                '⏱️ 10초 뒤 예약 알림 테스트 (화면 끄고 확인)',
-                style: GoogleFonts.notoSansKr(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  '⏱️ 10초 뒤 예약 알림 테스트 (화면 끄고 확인)',
+                  style: GoogleFonts.notoSansKr(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               style: OutlinedButton.styleFrom(

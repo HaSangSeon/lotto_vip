@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../utils/safe_google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../theme/app_theme.dart';
 
@@ -11,6 +11,7 @@ class QrHeroCard extends StatelessWidget {
   final bool isNetworkError;
   final int winCount;
   final int totalPrize;
+  final int totalNetPrize;
   final NumberFormat fmt;
   final String dateStr;
   final bool isLight;
@@ -27,6 +28,7 @@ class QrHeroCard extends StatelessWidget {
     required this.isNetworkError,
     required this.winCount,
     required this.totalPrize,
+    this.totalNetPrize = 0,
     required this.fmt,
     required this.dateStr,
     required this.isLight,
@@ -114,26 +116,80 @@ class QrHeroCard extends StatelessWidget {
                   width: 1,
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
-                  Text(
-                    '총 당첨금액',
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '총 당첨금액 (세전)',
+                        style: GoogleFonts.notoSansKr(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '${fmt.format(totalPrize)}원',
+                            style: GoogleFonts.rajdhani(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                              color: isLight ? AppColors.goldDeep : AppColors.goldLight,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    '${fmt.format(totalPrize)}원',
-                    style: GoogleFonts.rajdhani(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      color: isLight ? AppColors.goldDeep : AppColors.goldLight,
-                      letterSpacing: 0.5,
+                  if (totalNetPrize > 0 && totalNetPrize != totalPrize) ...[
+                    const SizedBox(height: 8),
+                    Divider(
+                      height: 1,
+                      color: AppColors.gold.withValues(alpha: isLight ? 0.2 : 0.15),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.account_balance_wallet_rounded,
+                              size: 14,
+                              color: isLight ? const Color(0xFF2E7D32) : const Color(0xFF81C784),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '세후 예상 실수령액',
+                              style: GoogleFonts.notoSansKr(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: isLight ? const Color(0xFF2E7D32) : const Color(0xFF81C784),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '${fmt.format(totalNetPrize)}원',
+                              style: GoogleFonts.rajdhani(
+                                fontSize: 21,
+                                fontWeight: FontWeight.w900,
+                                color: isLight ? const Color(0xFF1B5E20) : const Color(0xFFA5D6A7),
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

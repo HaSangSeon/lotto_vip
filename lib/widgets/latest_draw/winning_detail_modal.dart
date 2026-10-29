@@ -359,7 +359,8 @@ Widget _buildRankRow(
   bool isFirst = false,
   bool isLast = false,
 }) {
-  final taxResult = LotteryTaxCalculator.calculate(rawAmount);
+  final isRollover = rawAmount <= 0 && isFirst;
+  final taxResult = isRollover ? null : LotteryTaxCalculator.calculate(rawAmount);
   final isLight = AppColors.isLight;
 
   return Padding(
@@ -405,83 +406,102 @@ Widget _buildRankRow(
                 ),
               ),
               const SizedBox(height: 3),
-              // 세전 당첨금
-              Row(
-                children: [
-                  Text(
-                    '세전 ',
+              if (isRollover) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isLight ? const Color(0xFFFFECEB) : const Color(0xFF4A120E),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '당첨자 없음 (다음 회차로 이월)',
                     style: GoogleFonts.notoSansKr(
                       fontSize: 11,
-                      color: AppColors.textHint,
-                    ),
-                  ),
-                  Text(
-                    fmt.format(rawAmount),
-                    style: GoogleFonts.notoSansKr(
-                      fontSize: 12.5,
                       fontWeight: FontWeight.w700,
-                      color: isFirst
-                          ? (AppColors.isLight ? AppColors.goldDeep : AppColors.gold)
-                          : AppColors.textPrimary,
+                      color: const Color(0xFFD32F2F),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              // 세후 실수령액 (하이라이트 박스)
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2.5),
-                  decoration: BoxDecoration(
-                    color: taxResult.isTaxFree
-                        ? (isLight ? const Color(0xFFE8F5E9) : const Color(0xFF1B5E20).withValues(alpha: 0.35))
-                        : (isLight ? const Color(0xFFFFF3E0) : const Color(0xFFE65100).withValues(alpha: 0.25)),
-                    borderRadius: BorderRadius.circular(5),
-                    border: Border.all(
-                      color: taxResult.isTaxFree
-                          ? (isLight ? const Color(0xFFA5D6A7) : const Color(0xFF2E7D32).withValues(alpha: 0.5))
-                          : (isLight ? const Color(0xFFFFCC80) : const Color(0xFFFF9800).withValues(alpha: 0.4)),
-                      width: 0.6,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '실수령 ',
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          color: taxResult.isTaxFree
-                              ? (isLight ? const Color(0xFF2E7D32) : const Color(0xFF81C784))
-                              : (isLight ? const Color(0xFFE65100) : const Color(0xFFFFB74D)),
-                        ),
-                      ),
-                      Text(
-                        fmt.format(taxResult.netAmount),
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
-                          color: taxResult.isTaxFree
-                              ? (isLight ? const Color(0xFF1B5E20) : const Color(0xFFA5D6A7))
-                              : (isLight ? const Color(0xFFBF360C) : const Color(0xFFFFCC80)),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '(${taxResult.taxDescription})',
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textHint,
-                        ),
-                      ),
-                    ],
                   ),
                 ),
-              ),
+              ] else ...[
+                // 세전 당첨금
+                Row(
+                  children: [
+                    Text(
+                      '세전 ',
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 11,
+                        color: AppColors.textHint,
+                      ),
+                    ),
+                    Text(
+                      fmt.format(rawAmount),
+                      style: GoogleFonts.notoSansKr(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: isFirst
+                            ? (AppColors.isLight ? AppColors.goldDeep : AppColors.gold)
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                // 세후 실수령액 (하이라이트 박스)
+                if (taxResult != null)
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: taxResult.isTaxFree
+                            ? (isLight ? const Color(0xFFE8F5E9) : const Color(0xFF1B5E20).withValues(alpha: 0.35))
+                            : (isLight ? const Color(0xFFFFF3E0) : const Color(0xFFE65100).withValues(alpha: 0.25)),
+                        borderRadius: BorderRadius.circular(5),
+                        border: Border.all(
+                          color: taxResult.isTaxFree
+                              ? (isLight ? const Color(0xFFA5D6A7) : const Color(0xFF2E7D32).withValues(alpha: 0.5))
+                              : (isLight ? const Color(0xFFFFCC80) : const Color(0xFFFF9800).withValues(alpha: 0.4)),
+                          width: 0.6,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '실수령 ',
+                            style: GoogleFonts.notoSansKr(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: taxResult.isTaxFree
+                                  ? (isLight ? const Color(0xFF2E7D32) : const Color(0xFF81C784))
+                                  : (isLight ? const Color(0xFFE65100) : const Color(0xFFFFB74D)),
+                            ),
+                          ),
+                          Text(
+                            fmt.format(taxResult.netAmount),
+                            style: GoogleFonts.notoSansKr(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              color: taxResult.isTaxFree
+                                  ? (isLight ? const Color(0xFF1B5E20) : const Color(0xFFA5D6A7))
+                                  : (isLight ? const Color(0xFFBF360C) : const Color(0xFFFFCC80)),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '(${taxResult.taxDescription})',
+                            style: GoogleFonts.notoSansKr(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textHint,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ],
           ),
         ),

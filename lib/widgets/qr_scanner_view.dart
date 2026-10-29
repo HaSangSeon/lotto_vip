@@ -20,8 +20,11 @@ class QrScannerView extends StatefulWidget {
 }
 
 class _QrScannerViewState extends State<QrScannerView> {
-  bool _isProcessing = false;
+  bool _isHandling = false;
+  bool _isLoading = false;
   bool _isTorchOn = false;
+  String? _lastScannedCode;
+  DateTime? _lastClosedTime;
   late final MobileScannerController _controller;
 
   @override
@@ -39,57 +42,95 @@ class _QrScannerViewState extends State<QrScannerView> {
     super.dispose();
   }
 
-  void _onDetect(BarcodeCapture capture) async {
-    if (_isProcessing) return;
+  void _onDetect(BarcodeCapture capture) {
+    if (_isHandling) return;
+
+    final now = DateTime.now();
+    // 팝업/시트를 방금 닫은 직후(0.4초 이내)에는 화면 전환 안정화를 위해 스캔 대기
+    if (_lastClosedTime != null &&
+        now.difference(_lastClosedTime!) < const Duration(milliseconds: 400)) {
+      return;
+    }
 
     final List<Barcode> barcodes = capture.barcodes;
     for (final barcode in barcodes) {
-      final String? code = barcode.rawValue;
-      if (code != null && code.trim().isNotEmpty) {
-        _isProcessing = true;
-        _handleQrCode(code);
+      final String? code = barcode.rawValue?.trim();
+      if (code != null && code.isNotEmpty) {
+        // 방금 확인하고 닫은 동일한 복권이 아직 카메라 앞에 머물러 있을 때 2.5초간 연속 재스캔 방지
+        // (단, 다른 복권 QR 코드를 비추면 즉시 인식)
+        if (_lastScannedCode == code &&
+            _lastClosedTime != null &&
+            now.difference(_lastClosedTime!) < const Duration(milliseconds: 2500)) {
+          continue;
+        }
+
+        _isHandling = true;
+        _handleQrCode(code, isManual: false);
         break;
       }
     }
   }
 
-  Future<void> _handleQrCode(String rawCode) async {
-    setState(() => _isProcessing = true);
+  Future<void> _handleQrCode(String rawCode, {bool isManual = false}) async {
+    _isHandling = true;
+    _lastScannedCode = rawCode.trim();
 
     try {
-      // 1. QR 코드 정밀 파싱 및 유효성 검사
+      // 1. QR 코드 정밀 파싱 및 유효성 검사 (즉시 동기 처리)
       final parseResult = QRLotteryParser.parseDetailed(rawCode);
 
-      if (parseResult.isSuccess) {
-        final qrData = parseResult.data!;
-
-        // 2. 해당 회차 공식 당첨 결과 조회
-        DHLotteryResult? drawResult;
-        bool isNetworkError = false;
-
-        try {
-          drawResult = await DHLotteryApi.fetchByDrawNo(qrData.drwNo);
-          // 추첨 시간이 지났는데 API 결과가 안 오는 경우 네트워크/서버 지연으로 처리
-          if (drawResult == null && qrData.isDrawnTimePassed) {
-            isNetworkError = true;
-          }
-        } catch (_) {
-          if (qrData.isDrawnTimePassed) {
-            isNetworkError = true;
-          }
+      if (!parseResult.isSuccess || parseResult.data == null) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          await _showErrorDialog(
+            errorType: parseResult.errorType ?? QRErrorType.invalidFormat,
+            errorMessage: parseResult.errorMessage ?? '올바른 로또 QR 코드가 아닙니다.',
+            rawCode: rawCode,
+          );
         }
+        return;
+      }
 
-        // 3. 보관함(히스토리)에 스캔한 실물 복권 묶음(영수증)으로 자동 저장
+      final qrData = parseResult.data!;
+      if (mounted) {
+        setState(() => _isLoading = true);
+      }
+
+      // 2. 해당 회차 공식 당첨 결과 조회
+      DHLotteryResult? drawResult;
+      bool isNetworkError = false;
+
+      try {
+        drawResult = await DHLotteryApi.fetchByDrawNo(qrData.drwNo);
+        // 추첨 시간이 지났는데 API 결과가 안 오는 경우 네트워크/서버 지연으로 처리
+        if (drawResult == null && qrData.isDrawnTimePassed) {
+          isNetworkError = true;
+        }
+      } catch (_) {
+        if (qrData.isDrawnTimePassed) {
+          isNetworkError = true;
+        }
+      }
+
+      // 3. 보관함(히스토리) 자동 저장 및 알림 갱신 (오류가 나도 결과 시트 표시는 절대 중단되지 않도록 격리)
+      bool isSavedToHistory = false;
+      try {
         final existingHistory = await HistoryService.load();
         final firstGame = qrData.games.first;
         final alreadySaved = existingHistory.any((e) {
           if (e.drawNo != qrData.drwNo) return false;
-          if (e.isTicket && e.games != null) {
-            return e.games!.length == qrData.games.length &&
-                e.games!.first.numbers.every((n) => firstGame.numbers.contains(n));
+          // 기존에 보관된 실물 복권(티켓)과의 일치 여부만 확인 (단일 추출번호로 인한 누락 방지)
+          if (!e.isTicket || e.games == null) return false;
+          if (e.games!.length != qrData.games.length) return false;
+          for (int i = 0; i < e.games!.length; i++) {
+            final savedNums = e.games![i].numbers;
+            final scannedNums = qrData.games[i].numbers;
+            if (savedNums.length != scannedNums.length ||
+                !savedNums.every((n) => scannedNums.contains(n))) {
+              return false;
+            }
           }
-          return e.numbers.length == firstGame.numbers.length &&
-              e.numbers.every((n) => firstGame.numbers.contains(n));
+          return true;
         });
 
         if (!alreadySaved) {
@@ -103,72 +144,72 @@ class _QrScannerViewState extends State<QrScannerView> {
           );
           await HistoryService.save(ticketEntry);
         }
-
-        // 신규 저장이든 기존 복권 재스캔이든 이번 주 토요일 맞춤 알림 스케줄을 100% 확실히 갱신/보장
-        await NotificationService.scheduleWeeklyDrawNotification();
-
+        isSavedToHistory = true;
         widget.onHistorySaved?.call();
+      } catch (_) {}
 
-        if (mounted) {
-          // 모달 시트가 화면을 덮는 동안 카메라를 정지하여 배터리 소모 및 발열 방지
-          try {
-            await _controller.stop();
-          } catch (_) {}
-
-          if (!mounted) return;
-
-          // 4. 앱 자체 프리미엄 결과 시트 표시
-          await QrResultSheet.show(
-            context,
-            qrData: qrData,
-            drawResult: drawResult,
-            isSavedToHistory: true,
-            isNetworkError: isNetworkError,
-            onRetry: () async {
-              return await DHLotteryApi.fetchByDrawNo(qrData.drwNo);
-            },
-          );
-
-          if (mounted) {
-            try {
-              await _controller.start();
-            } catch (_) {}
-            setState(() => _isProcessing = false);
-          }
+      // 알림 스케줄 갱신 (비동기 격리)
+      try {
+        if (NotificationService.isEnabled) {
+          await NotificationService.scheduleWeeklyDrawNotification();
         }
-      } else {
-        // 파싱 실패 시: 오류 종류에 맞추어 친절한 예외 처리 다이얼로그 표시
-        if (mounted) {
-          _showErrorDialog(
-            errorType: parseResult.errorType ?? QRErrorType.invalidFormat,
-            errorMessage: parseResult.errorMessage ?? '올바른 로또 QR 코드가 아닙니다.',
-            rawCode: rawCode,
-          );
-        }
-      }
+      } catch (_) {}
+
+      if (!mounted) return;
+
+      // 결과 시트를 띄우기 전 로딩 오버레이 즉시 해제
+      setState(() => _isLoading = false);
+
+      // 4. 앱 자체 프리미엄 결과 시트 표시
+      await QrResultSheet.show(
+        context,
+        qrData: qrData,
+        drawResult: drawResult,
+        isSavedToHistory: isSavedToHistory,
+        isNetworkError: isNetworkError,
+        onRetry: () async {
+          return await DHLotteryApi.fetchByDrawNo(qrData.drwNo);
+        },
+      );
     } catch (e) {
       if (mounted) {
-        _showErrorDialog(
+        setState(() => _isLoading = false);
+        await _showErrorDialog(
           errorType: QRErrorType.invalidFormat,
           errorMessage: 'QR 코드를 처리하는 도중 예상치 못한 오류가 발생했습니다.\n다시 시도해 주세요.',
           rawCode: rawCode,
         );
       }
+    } finally {
+      // 안드로이드 시스템 뒤로가기(Back) 제스처로 시트/팝업을 닫더라도 100% 스캔 상태 복구 보장
+      _lastClosedTime = DateTime.now();
+      if (isManual) {
+        _lastScannedCode = null;
+      }
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isHandling = false;
+        });
+      } else {
+        _isLoading = false;
+        _isHandling = false;
+      }
     }
   }
 
   /// 예외 상황 전용 친절한 다이얼로그
-  void _showErrorDialog({
+  Future<void> _showErrorDialog({
     required QRErrorType errorType,
     required String errorMessage,
     required String rawCode,
-  }) {
+  }) async {
     final isPension = errorType == QRErrorType.pensionLottery;
     final isHttpUrl = rawCode.startsWith('http://') || rawCode.startsWith('https://');
 
-    showDialog(
+    await showDialog(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
@@ -180,12 +221,16 @@ class _QrScannerViewState extends State<QrScannerView> {
               size: 24,
             ),
             const SizedBox(width: 8),
-            Text(
-              isPension ? '연금복권 QR 감지' : 'QR 코드 확인 필요',
-              style: GoogleFonts.notoSansKr(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+            Expanded(
+              child: Text(
+                isPension ? '연금복권 QR 감지' : 'QR 코드 확인 필요',
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -232,11 +277,8 @@ class _QrScannerViewState extends State<QrScannerView> {
                 Navigator.pop(ctx);
                 try {
                   final uri = Uri.parse(rawCode);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
                 } catch (_) {}
-                if (mounted) setState(() => _isProcessing = false);
               },
               child: Text(
                 '웹브라우저로 열기',
@@ -244,10 +286,7 @@ class _QrScannerViewState extends State<QrScannerView> {
               ),
             ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() => _isProcessing = false);
-            },
+            onPressed: () => Navigator.pop(ctx),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.isLight ? AppColors.goldDark : AppColors.gold,
               foregroundColor: AppColors.isLight ? Colors.white : Colors.black,
@@ -270,7 +309,7 @@ class _QrScannerViewState extends State<QrScannerView> {
       builder: (ctx) => Dialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -295,11 +334,19 @@ class _QrScannerViewState extends State<QrScannerView> {
               const SizedBox(height: 16),
               TextField(
                 controller: urlCtrl,
+                autofocus: true,
                 decoration: InputDecoration(
                   hintText: 'https://m.dhlottery.co.kr/qr.do?method=winQr&v=...',
                   hintStyle: GoogleFonts.notoSansKr(fontSize: 12, color: AppColors.textHint),
                 ),
                 style: GoogleFonts.notoSansKr(fontSize: 13, color: AppColors.textPrimary),
+                onSubmitted: (val) {
+                  final input = val.trim();
+                  if (input.isNotEmpty) {
+                    Navigator.pop(ctx);
+                    _handleQrCode(input, isManual: true);
+                  }
+                },
               ),
               const SizedBox(height: 20),
               Row(
@@ -315,7 +362,7 @@ class _QrScannerViewState extends State<QrScannerView> {
                       final input = urlCtrl.text.trim();
                       if (input.isNotEmpty) {
                         Navigator.pop(ctx);
-                        _handleQrCode(input);
+                        _handleQrCode(input, isManual: true);
                       }
                     },
                     style: ElevatedButton.styleFrom(
@@ -332,6 +379,24 @@ class _QrScannerViewState extends State<QrScannerView> {
         ),
       ),
     );
+  }
+
+  Future<void> _toggleTorch() async {
+    try {
+      await _controller.toggleTorch();
+      if (mounted) {
+        setState(() => _isTorchOn = !_isTorchOn);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _retryCamera() async {
+    try {
+      await _controller.stop();
+    } catch (_) {}
+    try {
+      await _controller.start();
+    } catch (_) {}
   }
 
   @override
@@ -356,10 +421,7 @@ class _QrScannerViewState extends State<QrScannerView> {
               _isTorchOn ? Icons.flash_on : Icons.flash_off,
               color: _isTorchOn ? AppColors.gold : Colors.white70,
             ),
-            onPressed: () {
-              _controller.toggleTorch();
-              setState(() => _isTorchOn = !_isTorchOn);
-            },
+            onPressed: _toggleTorch,
           ),
           // 수동 입력
           IconButton(
@@ -381,15 +443,16 @@ class _QrScannerViewState extends State<QrScannerView> {
                 fit: BoxFit.cover,
                 errorBuilder: (context, error) {
                   return Center(
-                    child: Padding(
+                    child: SingleChildScrollView(
                       padding: const EdgeInsets.all(32.0),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.videocam_off_rounded, color: Colors.white70, size: 64),
+                          const Icon(Icons.videocam_off_rounded, color: Colors.white70, size: 60),
                           const SizedBox(height: 16),
                           Text(
                             '카메라를 실행할 수 없습니다.',
+                            textAlign: TextAlign.center,
                             style: GoogleFonts.notoSansKr(
                               color: Colors.white,
                               fontSize: 16,
@@ -398,7 +461,7 @@ class _QrScannerViewState extends State<QrScannerView> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            '카메라 권한이 허용되지 않았거나 카메라를 사용할 수 없습니다.\n[URL 직접 입력] 버튼으로 당첨을 확인하실 수 있습니다.',
+                            '카메라 권한이 허용되지 않았거나 일시적으로 사용할 수 없습니다.\n권한 확인 후 다시 시도하거나 URL을 직접 입력해 주세요.',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.notoSansKr(
                               color: Colors.white70,
@@ -407,19 +470,40 @@ class _QrScannerViewState extends State<QrScannerView> {
                             ),
                           ),
                           const SizedBox(height: 24),
-                          ElevatedButton.icon(
-                            onPressed: _showManualInputDialog,
-                            icon: const Icon(Icons.keyboard, size: 18),
-                            label: Text(
-                              'QR URL 직접 입력하기',
-                              style: GoogleFonts.notoSansKr(fontWeight: FontWeight.bold),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.gold,
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: _retryCamera,
+                                icon: const Icon(Icons.refresh_rounded, size: 18),
+                                label: Text(
+                                  '카메라 다시 연결',
+                                  style: GoogleFonts.notoSansKr(fontWeight: FontWeight.bold),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.gold,
+                                  foregroundColor: Colors.black,
+                                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: _showManualInputDialog,
+                                icon: const Icon(Icons.keyboard, size: 18),
+                                label: Text(
+                                  'QR URL 직접 입력',
+                                  style: GoogleFonts.notoSansKr(fontWeight: FontWeight.bold),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  side: const BorderSide(color: Colors.white54),
+                                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -429,104 +513,116 @@ class _QrScannerViewState extends State<QrScannerView> {
               ),
             ),
 
-            // 어두운 오버레이
+            // 어두운 오버레이 (무시 가능한 포인터 처리로 카메라 에러 버튼 터치 보장)
             Positioned.fill(
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.4),
+              child: IgnorePointer(
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.4),
+                ),
               ),
             ),
 
-            // 스캔 가이드 영역 (중앙 260x260 박스)
+            // 스캔 가이드 영역 (중앙 260x260 박스, 터치 투과)
             Center(
-              child: Container(
-                width: 260,
-                height: 260,
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  border: Border.all(
-                    color: AppColors.gold,
-                    width: 3,
+              child: IgnorePointer(
+                child: Container(
+                  width: 260,
+                  height: 260,
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    border: Border.all(
+                      color: AppColors.gold,
+                      width: 3,
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.gold.withValues(alpha: 0.35),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                      ),
+                    ],
                   ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.gold.withValues(alpha: 0.35),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    // 모서리 원형 포인트
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      child: Container(width: 14, height: 14, decoration: const BoxDecoration(color: AppColors.gold, shape: BoxShape.circle)),
-                    ),
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Container(width: 14, height: 14, decoration: const BoxDecoration(color: AppColors.gold, shape: BoxShape.circle)),
-                    ),
-                    Positioned(
-                      bottom: 12,
-                      left: 12,
-                      child: Container(width: 14, height: 14, decoration: const BoxDecoration(color: AppColors.gold, shape: BoxShape.circle)),
-                    ),
-                    Positioned(
-                      bottom: 12,
-                      right: 12,
-                      child: Container(width: 14, height: 14, decoration: const BoxDecoration(color: AppColors.gold, shape: BoxShape.circle)),
-                    ),
-                  ],
+                  child: Stack(
+                    children: [
+                      // 모서리 원형 포인트
+                      Positioned(
+                        top: 12,
+                        left: 12,
+                        child: Container(width: 14, height: 14, decoration: const BoxDecoration(color: AppColors.gold, shape: BoxShape.circle)),
+                      ),
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: Container(width: 14, height: 14, decoration: const BoxDecoration(color: AppColors.gold, shape: BoxShape.circle)),
+                      ),
+                      Positioned(
+                        bottom: 12,
+                        left: 12,
+                        child: Container(width: 14, height: 14, decoration: const BoxDecoration(color: AppColors.gold, shape: BoxShape.circle)),
+                      ),
+                      Positioned(
+                        bottom: 12,
+                        right: 12,
+                        child: Container(width: 14, height: 14, decoration: const BoxDecoration(color: AppColors.gold, shape: BoxShape.circle)),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
 
             // 하단 안내 메시지
             Positioned(
-              bottom: 80,
+              bottom: 48,
               left: 20,
               right: 20,
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.75),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    child: Text(
-                      '로또 용지의 QR 코드를 사각형 안에 맞추어 주세요',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.notoSansKr(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.75),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: Text(
+                        '로또 용지의 QR 코드를 사각형 안에 맞추어 주세요',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.notoSansKr(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton.icon(
-                    onPressed: _showManualInputDialog,
-                    icon: const Icon(Icons.link, color: AppColors.goldLight, size: 16),
-                    label: Text(
-                      '카메라 사용이 불가한 경우 URL 직접 입력',
-                      style: GoogleFonts.notoSansKr(
-                        color: AppColors.goldLight,
-                        fontSize: 12,
-                        decoration: TextDecoration.underline,
+                    const SizedBox(height: 10),
+                    TextButton.icon(
+                      onPressed: _showManualInputDialog,
+                      icon: const Icon(Icons.link, color: AppColors.goldLight, size: 16),
+                      label: Flexible(
+                        child: Text(
+                          '카메라 사용이 불가한 경우 URL 직접 입력',
+                          style: GoogleFonts.notoSansKr(
+                            color: AppColors.goldLight,
+                            fontSize: 12,
+                            decoration: TextDecoration.underline,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
 
-            // 처리 중 로딩 인디케이터 오버레이
-            if (_isProcessing)
+            // 처리 중 로딩 인디케이터 오버레이 (네트워크/저장 중일 때만 표시)
+            if (_isLoading)
               Positioned.fill(
                 child: Container(
                   color: Colors.black.withValues(alpha: 0.75),

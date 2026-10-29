@@ -1,12 +1,13 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../utils/safe_google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../theme/app_theme.dart';
 import '../services/qr_lottery_parser.dart';
 import '../services/dhlottery_api.dart';
+import '../utils/lottery_tax_calculator.dart';
 import 'qr/qr_hero_card.dart';
 import 'qr/qr_game_cards.dart';
 
@@ -88,24 +89,30 @@ class _QrResultSheetState extends State<QrResultSheet> {
 
       if (matchCount == 6) {
         rank = 1;
-        label = '🥇 1등 당첨!';
         prize = _currentDrawResult!.firstWinamnt;
+        label = prize > 0
+            ? '🥇 1등 (${NumberFormat('#,###').format(prize)}원)'
+            : '🥇 1등 당첨!';
       } else if (matchCount == 5 && isBonus) {
         rank = 2;
-        label = '🥈 2등 당첨!';
-        prize = _currentDrawResult!.rank2Amount > 0 ? _currentDrawResult!.rank2Amount : 50000000;
+        prize = _currentDrawResult!.rank2Amount;
+        label = prize > 0
+            ? '🥈 2등 (${NumberFormat('#,###').format(prize)}원)'
+            : '🥈 2등 당첨! (집계중)';
       } else if (matchCount == 5) {
         rank = 3;
-        label = '🥉 3등 당첨!';
-        prize = _currentDrawResult!.rank3Amount > 0 ? _currentDrawResult!.rank3Amount : 1500000;
+        prize = _currentDrawResult!.rank3Amount;
+        label = prize > 0
+            ? '🥉 3등 (${NumberFormat('#,###').format(prize)}원)'
+            : '🥉 3등 당첨! (집계중)';
       } else if (matchCount == 4) {
         rank = 4;
-        label = '4등 (5만원)';
         prize = _currentDrawResult!.rank4Amount > 0 ? _currentDrawResult!.rank4Amount : 50000;
+        label = '4등 (5만원)';
       } else if (matchCount == 3) {
         rank = 5;
-        label = '5등 (5천원)';
         prize = _currentDrawResult!.rank5Amount > 0 ? _currentDrawResult!.rank5Amount : 5000;
+        label = '5등 (5천원)';
       } else {
         rank = 0;
         label = matchCount > 0 ? '$matchCount개 일치' : '낙첨';
@@ -144,12 +151,12 @@ class _QrResultSheetState extends State<QrResultSheet> {
 
   Future<void> _openOfficialWeb() async {
     try {
-      final uri = Uri.parse(widget.qrData.rawUrl.isNotEmpty
-          ? widget.qrData.rawUrl
-          : 'https://m.dhlottery.co.kr/qr.do?method=winQr&v=${widget.qrData.drwNo}');
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      String raw = widget.qrData.rawUrl.trim();
+      if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
+        raw = 'https://m.dhlottery.co.kr/qr.do?method=winQr&v=${widget.qrData.drwNo}';
       }
+      final uri = Uri.parse(raw);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {}
   }
 
@@ -161,6 +168,11 @@ class _QrResultSheetState extends State<QrResultSheet> {
     final isDrawn = _currentDrawResult != null;
     final winningGames = evaluations.where((e) => e.rank >= 1 && e.rank <= 5).toList();
     final totalPrize = winningGames.fold<int>(0, (sum, e) => sum + e.prizeAmount);
+    final totalNetPrize = winningGames.fold<int>(0, (sum, e) {
+      if (e.prizeAmount <= 0) return sum;
+      final tax = LotteryTaxCalculator.calculate(e.prizeAmount);
+      return sum + tax.netAmount;
+    });
     final hasWin = winningGames.isNotEmpty;
 
     final drawDate = widget.qrData.drawDate;
@@ -237,6 +249,7 @@ class _QrResultSheetState extends State<QrResultSheet> {
                       isNetworkError: _networkError,
                       winCount: winningGames.length,
                       totalPrize: totalPrize,
+                      totalNetPrize: totalNetPrize,
                       fmt: currencyFmt,
                       dateStr: dateStr,
                       isLight: isLight,

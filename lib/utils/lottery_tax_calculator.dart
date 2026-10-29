@@ -53,15 +53,18 @@ class LotteryTaxCalculator {
     // 과세 표준 = 당첨금 - 복권 구입비용 (1,000원)
     final taxableBase = (amount > ticketCost) ? (amount - ticketCost) : amount;
 
-    // 2. 200만 원 초과 ~ 3억 원 이하 (22% 세율 적용)
+    // 2. 200만 원 초과 ~ 3억 원 이하 (소득세 20% + 지방소득세 2% = 총 22%)
+    // 세법상 원천징수: 소득세 10원 미만 절사, 지방소득세는 소득세의 10%(10원 미만 절사)
     if (amount <= 300000000) {
-      final tax = (taxableBase * 0.22).floor();
-      final net = amount - tax;
-      final rate = amount > 0 ? (tax / amount * 100) : 22.0;
+      final incomeTax = ((taxableBase * 0.20) ~/ 10) * 10;
+      final localTax = ((incomeTax * 0.10) ~/ 10) * 10;
+      final totalTax = incomeTax + localTax;
+      final net = amount - totalTax;
+      final rate = amount > 0 ? (totalTax / amount * 100) : 22.0;
 
       return LotteryTaxResult(
         originalAmount: amount,
-        taxAmount: tax,
+        taxAmount: totalTax,
         netAmount: net,
         effectiveTaxRate: double.parse(rate.toStringAsFixed(1)),
         taxDescription: '세금 22% 공제',
@@ -69,14 +72,16 @@ class LotteryTaxCalculator {
       );
     }
 
-    // 3. 3억 원 초과 (3억까지 22% + 3억 초과분 33% 누진 세율 적용)
-    final baseUpTo300M = 300000000 - ticketCost;
-    final taxUpTo300M = (baseUpTo300M * 0.22).floor(); // 65,999,780원
+    // 3. 3억 원 초과 (농협·국세청 실무 계산 기준)
+    // - 3억 원까지 세액: 66,000,000원 (소득세 6,000만 + 지방소득세 600만)
+    // - 3억 원 초과분: 필요경비 1,000원 공제 후 33% (소득세 30% + 지방소득세 3%)
+    const taxUpTo300M = 66000000;
+    final excessBase = (amount - 300000000 - ticketCost).clamp(0, double.maxFinite.toInt());
+    final excessIncomeTax = ((excessBase * 0.30) ~/ 10) * 10;
+    final excessLocalTax = ((excessIncomeTax * 0.10) ~/ 10) * 10;
+    final excessTotalTax = excessIncomeTax + excessLocalTax;
 
-    final baseOver300M = amount - 300000000;
-    final taxOver300M = (baseOver300M * 0.33).floor();
-
-    final totalTax = taxUpTo300M + taxOver300M;
+    final totalTax = taxUpTo300M + excessTotalTax;
     final net = amount - totalTax;
     final rate = amount > 0 ? (totalTax / amount * 100) : 33.0;
 
@@ -85,7 +90,7 @@ class LotteryTaxCalculator {
       taxAmount: totalTax,
       netAmount: net,
       effectiveTaxRate: double.parse(rate.toStringAsFixed(1)),
-      taxDescription: '세금 약 33% 공제',
+      taxDescription: '세금 약 33% 누진 공제',
       isTaxFree: false,
     );
   }

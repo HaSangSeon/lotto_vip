@@ -66,11 +66,20 @@ class TicketSummaryData {
 
     String label = '';
     if (winCounts.containsKey(1)) {
-      label = '🎉 1등 당첨!';
+      final others = winCounts.entries.where((e) => e.key != 1).fold<int>(0, (s, e) => s + e.value);
+      label = others > 0
+          ? '🎉 1등 당첨! 외 $others개'
+          : (winCounts[1]! > 1 ? '🎉 1등 ${winCounts[1]}개 당첨!' : '🎉 1등 당첨!');
     } else if (winCounts.containsKey(2)) {
-      label = '🎉 2등 당첨!';
+      final others = winCounts.entries.where((e) => e.key != 2).fold<int>(0, (s, e) => s + e.value);
+      label = others > 0
+          ? '🎉 2등 당첨! 외 $others개'
+          : (winCounts[2]! > 1 ? '🎉 2등 ${winCounts[2]}개 당첨!' : '🎉 2등 당첨!');
     } else if (winCounts.containsKey(3)) {
-      label = '🎉 3등 당첨!';
+      final others = winCounts.entries.where((e) => e.key != 3).fold<int>(0, (s, e) => s + e.value);
+      label = others > 0
+          ? '🎉 3등 당첨! 외 $others개'
+          : (winCounts[3]! > 1 ? '🎉 3등 ${winCounts[3]}개 당첨!' : '🎉 3등 당첨!');
     } else if (winCounts.containsKey(4) && winCounts.containsKey(5)) {
       label = '🎉 4등 ${winCounts[4]}개 · 5등 ${winCounts[5]}개';
     } else if (winCounts.containsKey(4)) {
@@ -144,9 +153,40 @@ class LottoTicketSummaryBadge extends StatelessWidget {
           : const Color(0xFFA5B4FC);
       icon = Icons.schedule_rounded;
     } else if (isWin) {
-      bg = isLight ? const Color(0xFFFFF3CD) : badgeColor.withValues(alpha: 0.22);
-      border = isLight ? const Color(0xFFFFC107) : badgeColor;
-      text = isLight ? const Color(0xFF8C5D00) : badgeColor;
+      if (isLight) {
+        switch (bestRank) {
+          case 1:
+            bg = const Color(0xFFFFF3CD);
+            border = const Color(0xFFFFC107);
+            text = const Color(0xFF8C5D00);
+            break;
+          case 2:
+            bg = const Color(0xFFEBF5FB);
+            border = const Color(0xFF3498DB);
+            text = const Color(0xFF1B4F72);
+            break;
+          case 3:
+            bg = const Color(0xFFFBEEE6);
+            border = const Color(0xFFE59866);
+            text = const Color(0xFF78281F);
+            break;
+          case 4:
+            bg = const Color(0xFFE8F8F5);
+            border = const Color(0xFF2ECC71);
+            text = const Color(0xFF145A32);
+            break;
+          case 5:
+          default:
+            bg = const Color(0xFFFEF9E7);
+            border = const Color(0xFFF39C12);
+            text = const Color(0xFF7D6608);
+            break;
+        }
+      } else {
+        bg = badgeColor.withValues(alpha: 0.22);
+        border = badgeColor;
+        text = badgeColor;
+      }
       icon = Icons.emoji_events_rounded;
     } else {
       bg = isLight ? const Color(0xFFF8F9F9) : Colors.white.withValues(alpha: 0.05);
@@ -200,15 +240,59 @@ class LottoMiniRankBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final isLight = AppColors.isLight;
     final isWin = rank >= 1 && rank <= 5;
+
+    Color bg;
+    Color border;
+    Color text;
+
+    if (isWin) {
+      if (isLight) {
+        switch (rank) {
+          case 1:
+            bg = const Color(0xFFFFF3CD);
+            border = const Color(0xFFFFC107);
+            text = const Color(0xFF8C5D00);
+            break;
+          case 2:
+            bg = const Color(0xFFEBF5FB);
+            border = const Color(0xFF3498DB);
+            text = const Color(0xFF1B4F72);
+            break;
+          case 3:
+            bg = const Color(0xFFFBEEE6);
+            border = const Color(0xFFE59866);
+            text = const Color(0xFF78281F);
+            break;
+          case 4:
+            bg = const Color(0xFFE8F8F5);
+            border = const Color(0xFF2ECC71);
+            text = const Color(0xFF145A32);
+            break;
+          case 5:
+          default:
+            bg = const Color(0xFFFEF9E7);
+            border = const Color(0xFFF39C12);
+            text = const Color(0xFF7D6608);
+            break;
+        }
+      } else {
+        bg = badgeColor.withValues(alpha: 0.2);
+        border = badgeColor;
+        text = badgeColor;
+      }
+    } else {
+      bg = isLight ? Colors.black.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.05);
+      border = isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white12;
+      text = AppColors.textHint;
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6.5, vertical: 2.5),
       decoration: BoxDecoration(
-        color: isWin
-            ? (isLight ? const Color(0xFFFFF3CD) : badgeColor.withValues(alpha: 0.2))
-            : (isLight ? Colors.black.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.05)),
+        color: bg,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: isWin ? badgeColor : (isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white12),
+          color: border,
           width: 0.8,
         ),
       ),
@@ -219,7 +303,7 @@ class LottoMiniRankBadge extends StatelessWidget {
         style: GoogleFonts.notoSansKr(
           fontSize: 10,
           fontWeight: isWin ? FontWeight.bold : FontWeight.w600,
-          color: isWin ? (isLight ? const Color(0xFF8C5D00) : badgeColor) : AppColors.textHint,
+          color: text,
         ),
       ),
     );

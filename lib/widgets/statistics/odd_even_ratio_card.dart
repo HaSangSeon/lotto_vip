@@ -6,11 +6,22 @@ import '../common_widgets.dart';
 
 /// 가장 유리한 홀짝 비율 통계 카드 위젯
 class OddEvenRatioCard extends StatelessWidget {
-  const OddEvenRatioCard({super.key});
+  final bool? isLight;
+
+  const OddEvenRatioCard({
+    super.key,
+    this.isLight,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveIsLight = isLight ?? AppColors.isLight;
+
     return GlassCard(
+      gradientColors: effectiveIsLight
+          ? const [Color(0xFFFFFEFA), Color(0xFFFFF8E0)]
+          : const [Color(0xFF181B28), Color(0xFF141722)],
+      borderColor: effectiveIsLight ? AppColors.lightGoldBorder.withValues(alpha: 0.35) : AppColors.borderGold,
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

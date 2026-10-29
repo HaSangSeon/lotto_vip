@@ -14,10 +14,12 @@ import '../lotto_ball.dart';
 import '../dialogs/calculation_loading_dialog.dart';
 
 class ShakeTabView extends StatefulWidget {
+  final bool? isLight;
   final void Function(String title, List<int> numbers)? onShowResult;
 
   const ShakeTabView({
     super.key,
+    this.isLight,
     this.onShowResult,
   });
 
@@ -25,10 +27,12 @@ class ShakeTabView extends StatefulWidget {
   State<ShakeTabView> createState() => _ShakeTabViewState();
 }
 
-class _ShakeTabViewState extends State<ShakeTabView> with SingleTickerProviderStateMixin {
+class _ShakeTabViewState extends State<ShakeTabView>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   StreamSubscription<AccelerometerEvent>? _accelerometerSub;
   late AnimationController _animCtrl;
   Timer? _cooldownTimer;
+  bool _isAppResumed = true;
 
   // 흔들림 게이지 (0.0 ~ 1.0, 4단계: 0.25, 0.50, 0.75, 1.0)
   double _shakeProgress = 0.0;
@@ -42,6 +46,7 @@ class _ShakeTabViewState extends State<ShakeTabView> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _animCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 320),
@@ -49,12 +54,20 @@ class _ShakeTabViewState extends State<ShakeTabView> with SingleTickerProviderSt
     _initSensor();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _isAppResumed = (state == AppLifecycleState.resumed);
+  }
+
   void _initSensor() {
     try {
       // 모든 안드로이드 기기 100% 탑재 물리 원시 가속도계 리슨
       _accelerometerSub = accelerometerEventStream().listen(
         (AccelerometerEvent event) {
-          if (!mounted || _isExtracting) return;
+          // 백그라운드거나 추출 중이거나 현재 화면이 최상단(Current Route)이 아니면 무시
+          if (!mounted || !_isAppResumed || _isExtracting) return;
+          final route = ModalRoute.of(context);
+          if (route != null && !route.isCurrent) return;
 
           final double gX = event.x;
           final double gY = event.y;
@@ -64,7 +77,7 @@ class _ShakeTabViewState extends State<ShakeTabView> with SingleTickerProviderSt
           // 지구 중력 가속도(약 9.8m/s²)를 뺀 순수 흔들림 변위량
           final double delta = (netForce - 9.80665).abs();
 
-          // 손목 스냅으로 가볍게 흔들었을 때 감지 (변위량 9.5 초과 또는 순간 가속도 19.5 초과)
+          // 손목 스냅으로 가볍게 흔들었을 때 감지
           if (delta > _shakeDeltaThreshold || netForce > 19.5 || netForce < 2.5) {
             final now = DateTime.now();
             if (now.difference(_lastShakeTime).inMilliseconds > 130) {
@@ -85,18 +98,16 @@ class _ShakeTabViewState extends State<ShakeTabView> with SingleTickerProviderSt
 
   void _onDeviceShaken() {
     if (_isExtracting) return;
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
 
     HapticFeedback.selectionClick();
     _animCtrl.forward(from: 0.0);
 
-    // 쿨다운 타이머 리셋 (3.5초 동안 추가 흔들림 없으면 점진적 감소)
+    // 쿨다운 타이머 리셋 (3초 동안 추가 흔들림 없으면 점진적으로 0까지 감소)
     _cooldownTimer?.cancel();
-    _cooldownTimer = Timer(const Duration(milliseconds: 3500), () {
-      if (mounted && !_isExtracting && _shakeProgress > 0.0) {
-        setState(() {
-          _shakeProgress = (_shakeProgress - 0.25).clamp(0.0, 1.0);
-        });
-      }
+    _cooldownTimer = Timer(const Duration(milliseconds: 3000), () {
+      _startGradualCooldown();
     });
 
     setState(() {
@@ -107,6 +118,23 @@ class _ShakeTabViewState extends State<ShakeTabView> with SingleTickerProviderSt
       _cooldownTimer?.cancel();
       _extractNumbers();
     }
+  }
+
+  void _startGradualCooldown() {
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer.periodic(const Duration(milliseconds: 600), (timer) {
+      if (!mounted || _isExtracting) {
+        timer.cancel();
+        return;
+      }
+      if (_shakeProgress > 0.0) {
+        setState(() {
+          _shakeProgress = (_shakeProgress - 0.25).clamp(0.0, 1.0);
+        });
+      } else {
+        timer.cancel();
+      }
+    });
   }
 
   Future<void> _extractNumbers() async {
@@ -125,7 +153,10 @@ class _ShakeTabViewState extends State<ShakeTabView> with SingleTickerProviderSt
       ),
     );
 
-    if (!mounted) return;
+    if (!mounted) {
+      _isExtracting = false;
+      return;
+    }
 
     // 1~45 무작위 6개 번호 생성
     final random = Random();
@@ -138,7 +169,6 @@ class _ShakeTabViewState extends State<ShakeTabView> with SingleTickerProviderSt
     setState(() {
       _recentNumbers = finalNumbers;
       _shakeProgress = 0.0;
-      _isExtracting = false;
     });
 
     // 보관함 자동 저장
@@ -151,14 +181,21 @@ class _ShakeTabViewState extends State<ShakeTabView> with SingleTickerProviderSt
     await HistoryService.save(entry);
     await NotificationService.scheduleWeeklyDrawNotification();
 
-    // 결과 시트 호출 (바텀시트 닫힐 때 전면광고 연동)
+    // 결과 시트 호출 (바텀시트가 닫힐 때까지 추가 추출 방지)
     if (widget.onShowResult != null) {
       widget.onShowResult!('🎲 흔들어 뽑은 행운 번호', finalNumbers);
     }
+    // 안전 지연 후 추출 플래그 해제 (결과창이 완전히 열린 후 중복 트리거 차단)
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) {
+        setState(() => _isExtracting = false);
+      }
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _cooldownTimer?.cancel();
     _accelerometerSub?.cancel();
     _animCtrl.dispose();
@@ -178,10 +215,10 @@ class _ShakeTabViewState extends State<ShakeTabView> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    final isLight = AppColors.isLight;
+    final isLight = widget.isLight ?? (Theme.of(context).brightness == Brightness.light);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 6, 20, 24),
+      padding: const EdgeInsets.only(bottom: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -477,30 +514,40 @@ class _ShakeTabViewState extends State<ShakeTabView> with SingleTickerProviderSt
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.bolt_rounded,
-                                size: 16,
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.bolt_rounded,
+                                  size: 16,
+                                  color: isLight ? AppColors.goldDeep : AppColors.gold,
+                                ),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    '모션 충전 게이지',
+                                    style: GoogleFonts.notoSansKr(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '$_stepCount / 4단계  (${(_shakeProgress * 100).toInt()}%)',
+                              style: GoogleFonts.rajdhani(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
                                 color: isLight ? AppColors.goldDeep : AppColors.gold,
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '모션 충전 게이지',
-                                style: GoogleFonts.notoSansKr(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            '$_stepCount / 4단계  (${(_shakeProgress * 100).toInt()}%)',
-                            style: GoogleFonts.rajdhani(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w800,
-                              color: isLight ? AppColors.goldDeep : AppColors.gold,
                             ),
                           ),
                         ],
@@ -605,13 +652,19 @@ class _ShakeTabViewState extends State<ShakeTabView> with SingleTickerProviderSt
                           color: isLight ? Colors.white : Colors.black87,
                         ),
                         const SizedBox(width: 7),
-                        Text(
-                          '직접 탭하여 흔들기 (터치 지원)',
-                          style: GoogleFonts.notoSansKr(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
-                            color: isLight ? Colors.white : Colors.black87,
-                            letterSpacing: -0.2,
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '직접 탭하여 흔들기 (터치 지원)',
+                              maxLines: 1,
+                              style: GoogleFonts.notoSansKr(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                                color: isLight ? Colors.white : Colors.black87,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -654,24 +707,31 @@ class _ShakeTabViewState extends State<ShakeTabView> with SingleTickerProviderSt
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.stars_rounded,
-                            color: isLight ? AppColors.goldDeep : AppColors.gold,
-                            size: 19,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '방금 흔들어 뽑은 행운 번호',
-                            style: GoogleFonts.notoSansKr(
-                              color: isLight ? AppColors.goldDeep : AppColors.goldText,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 15,
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.stars_rounded,
+                              color: isLight ? AppColors.goldDeep : AppColors.gold,
+                              size: 19,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                '방금 흔들어 뽑은 행운 번호',
+                                style: GoogleFonts.notoSansKr(
+                                  color: isLight ? AppColors.goldDeep : AppColors.goldText,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
@@ -682,12 +742,15 @@ class _ShakeTabViewState extends State<ShakeTabView> with SingleTickerProviderSt
                             width: 0.8,
                           ),
                         ),
-                        child: Text(
-                          '보관함 저장완료 💾',
-                          style: GoogleFonts.notoSansKr(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: isLight ? const Color(0xFF2E7D32) : const Color(0xFFA5D6A7),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '보관함 저장완료 💾',
+                            style: GoogleFonts.notoSansKr(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: isLight ? const Color(0xFF2E7D32) : const Color(0xFFA5D6A7),
+                            ),
                           ),
                         ),
                       ),

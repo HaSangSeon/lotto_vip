@@ -2,13 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
+import '../services/statistics_service.dart';
 import '../theme/app_theme.dart';
 import 'statistics/stat_section_card.dart';
 import 'statistics/odd_even_ratio_card.dart';
 import 'statistics/companion_number_card.dart';
+import 'statistics/color_section_card.dart';
+import 'statistics/combination_analysis_card.dart';
+import 'statistics/combination_diagnosis_card.dart';
 
 class StatisticsTab extends StatefulWidget {
-  const StatisticsTab({super.key});
+  final bool? isLight;
+
+  const StatisticsTab({
+    super.key,
+    this.isLight,
+  });
 
   @override
   State<StatisticsTab> createState() => _StatisticsTabState();
@@ -26,26 +35,9 @@ class _StatisticsTabState extends State<StatisticsTab> {
     {'number': 28, 'count': 2},
   ];
 
-  // 실제 동행복권 역대 누적 통계 기반 더미 데이터
-  final List<Map<String, dynamic>> _hotNumbers = [
-    {'number': 43, 'count': 192},
-    {'number': 34, 'count': 188},
-    {'number': 12, 'count': 186},
-    {'number': 27, 'count': 184},
-    {'number': 13, 'count': 183},
-    {'number': 18, 'count': 182},
-    {'number': 39, 'count': 180},
-  ];
-
-  final List<Map<String, dynamic>> _coldNumbers = [
-    {'number': 9, 'count': 138},
-    {'number': 29, 'count': 141},
-    {'number': 41, 'count': 143},
-    {'number': 22, 'count': 145},
-    {'number': 23, 'count': 145},
-    {'number': 8, 'count': 148},
-    {'number': 32, 'count': 149},
-  ];
+  // 실제 동행복권 역대 누적 공식 통계 기반 데이터
+  late final List<Map<String, dynamic>> _hotNumbers = StatisticsService.getHotNumbers(7);
+  late final List<Map<String, dynamic>> _coldNumbers = StatisticsService.getColdNumbers(7);
 
   final List<Map<String, dynamic>> _overdueNumbers = [
     {'number': 2, 'weeks': 15},
@@ -59,7 +51,7 @@ class _StatisticsTabState extends State<StatisticsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final isLight = AppColors.isLight;
+    final isLight = widget.isLight ?? (Theme.of(context).brightness == Brightness.light);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
@@ -133,7 +125,7 @@ class _StatisticsTabState extends State<StatisticsTab> {
           const SizedBox(height: 20),
 
           // 5. 짝꿍 번호 (궁합) 섹션
-          const CompanionNumberCard()
+          CompanionNumberCard(isLight: isLight)
               .animate()
               .fadeIn(duration: 400.ms, delay: 50.ms)
               .slideY(begin: 0.2, end: 0, duration: 400.ms),
@@ -141,9 +133,33 @@ class _StatisticsTabState extends State<StatisticsTab> {
           const SizedBox(height: 20),
 
           // 6. 짝홀 비율 섹션
-          const OddEvenRatioCard()
+          OddEvenRatioCard(isLight: isLight)
               .animate()
               .fadeIn(duration: 400.ms, delay: 200.ms)
+              .slideY(begin: 0.2, end: 0, duration: 400.ms),
+
+          const SizedBox(height: 20),
+
+          // 7. 색상(구간)별 출현율 & 멸(滅) 분석 섹션
+          ColorSectionCard(isLight: isLight)
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 250.ms)
+              .slideY(begin: 0.2, end: 0, duration: 400.ms),
+
+          const SizedBox(height: 20),
+
+          // 8. 총합 황금구간 & 연속번호 분석 섹션
+          CombinationAnalysisCard(isLight: isLight)
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 300.ms)
+              .slideY(begin: 0.2, end: 0, duration: 400.ms),
+
+          const SizedBox(height: 20),
+
+          // 9. 내 번호 황금 밸런스 실시간 진단기
+          CombinationDiagnosisCard(isLight: isLight)
+              .animate()
+              .fadeIn(duration: 400.ms, delay: 350.ms)
               .slideY(begin: 0.2, end: 0, duration: 400.ms),
         ],
       ),

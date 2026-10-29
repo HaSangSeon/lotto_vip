@@ -35,8 +35,8 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
   @override
   void initState() {
     super.initState();
-    _inc = List.from(widget.includeNumbers);
-    _exc = List.from(widget.excludeNumbers);
+    _inc = List.from(widget.includeNumbers)..sort();
+    _exc = List.from(widget.excludeNumbers)..sort();
     _warningAnimCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 250),
@@ -76,6 +76,7 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
         if (_exc.length < 39) {
           _inc.remove(num);
           _exc.add(num);
+          _exc.sort();
           _warningMessage = null;
         } else {
           _showInSheetWarning('제외수는 최대 39개까지만 선택 가능합니다.');
@@ -88,6 +89,7 @@ class _CustomSettingsSheetState extends State<CustomSettingsSheet>
         // 일반 → 꼭 넣기
         if (_inc.length < 5) {
           _inc.add(num);
+          _inc.sort();
           _warningMessage = null;
         } else {
           _showInSheetWarning('고정수는 최대 5개까지만 선택할 수 있습니다.');

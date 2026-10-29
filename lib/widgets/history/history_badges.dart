@@ -154,6 +154,13 @@ class LottoTypeBadge extends StatelessWidget {
         label = '🎂 생년월일';
         break;
 
+      case LottoEntryType.diagnosis:
+        bg = isLight ? const Color(0xFFEDE7F6) : const Color(0xFF7E57C2).withValues(alpha: 0.20);
+        border = isLight ? const Color(0xFF7E57C2) : const Color(0xFF7E57C2).withValues(alpha: 0.65);
+        textColor = isLight ? const Color(0xFF4527A0) : const Color(0xFFD1C4E9);
+        label = '🎯 밸런스진단';
+        break;
+
       case LottoEntryType.customFilter:
         bg = isLight ? const Color(0xFFE0F7FA) : const Color(0xFF00ACC1).withValues(alpha: 0.18);
         border = isLight ? const Color(0xFF00ACC1) : const Color(0xFF00ACC1).withValues(alpha: 0.6);

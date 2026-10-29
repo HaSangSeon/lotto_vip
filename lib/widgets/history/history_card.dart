@@ -78,57 +78,70 @@ class HistoryCard extends StatelessWidget {
           Row(
             children: [
               // 좌측: 유형 + 회차
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  LottoTypeBadge(type: entry.entryType),
-                  const SizedBox(width: 6),
-                  LottoDrawBadge(drawNo: entry.drawNo, gameLabel: gameLabel),
-                ],
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LottoTypeBadge(type: entry.entryType),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: LottoDrawBadge(drawNo: entry.drawNo, gameLabel: gameLabel),
+                    ),
+                  ],
+                ),
               ),
 
-              const Spacer(),
+              const SizedBox(width: 8),
 
-              // 우측: 당첨/추첨대기 뱃지 + 원형 액션 버튼 (말줄임 없이 온전한 크기 유지)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  LottoRankBadgeWidget(
-                    rank: rank,
-                    label: rankLabel,
-                    matchedNumbers: matchedNumbers,
-                  ),
-                  const SizedBox(width: 8),
+              // 우측: 당첨/추첨대기 뱃지 + 원형 액션 버튼 (오버플로우 원천 방지)
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: LottoRankBadgeWidget(
+                          rank: rank,
+                          label: rankLabel,
+                          matchedNumbers: matchedNumbers,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
 
-                  // 즐겨찾기 원형 소프트 버튼
-                  HistoryActionButton(
-                    icon: isFavorite
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    iconColor: isFavorite
-                        ? (isLight ? const Color(0xFFE53935) : const Color(0xFFFF5252))
-                        : AppColors.textHint,
-                    bgColor: isFavorite
-                        ? (isLight
-                            ? const Color(0xFFFFECEB)
-                            : const Color(0xFFE53935).withValues(alpha: 0.18))
-                        : null,
-                    borderColor: isFavorite
-                        ? (isLight
-                            ? const Color(0xFFFF8A80).withValues(alpha: 0.6)
-                            : const Color(0xFFFF5252).withValues(alpha: 0.4))
-                        : null,
-                    onTap: onToggleFavorite,
-                  ),
-                  const SizedBox(width: 6),
+                    // 즐겨찾기 원형 소프트 버튼
+                    HistoryActionButton(
+                      icon: isFavorite
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      iconColor: isFavorite
+                          ? (isLight ? const Color(0xFFE53935) : const Color(0xFFFF5252))
+                          : AppColors.textHint,
+                      bgColor: isFavorite
+                          ? (isLight
+                              ? const Color(0xFFFFECEB)
+                              : const Color(0xFFE53935).withValues(alpha: 0.18))
+                          : null,
+                      borderColor: isFavorite
+                          ? (isLight
+                              ? const Color(0xFFFF8A80).withValues(alpha: 0.6)
+                              : const Color(0xFFFF5252).withValues(alpha: 0.4))
+                          : null,
+                      onTap: onToggleFavorite,
+                    ),
+                    const SizedBox(width: 6),
 
-                  // 개별 삭제 원형 소프트 버튼
-                  HistoryActionButton(
-                    icon: Icons.delete_outline_rounded,
-                    iconColor: AppColors.textHint,
-                    onTap: onDelete,
-                  ),
-                ],
+                    // 개별 삭제 원형 소프트 버튼
+                    HistoryActionButton(
+                      icon: Icons.delete_outline_rounded,
+                      iconColor: AppColors.textHint,
+                      onTap: onDelete,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -163,8 +176,8 @@ class HistoryCard extends StatelessWidget {
             child: LottoBallRow(
               numbers: entry.numbers,
               ballSize: 38,
-              matchedNumbers: matchedNumbers.isNotEmpty ? matchedNumbers : null,
-              bonusNumber: bonusNumber,
+              matchedNumbers: (rank >= 0) ? matchedNumbers : null,
+              bonusNumber: (rank == 2) ? bonusNumber : null,
             ),
           ),
 

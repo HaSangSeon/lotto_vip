@@ -39,9 +39,20 @@ class _ResultSheetState extends State<ResultSheet> {
     try {
       final image = await _screenshotController.capture(pixelRatio: 3.0);
       if (image != null) {
-        final hasAccess = await Gal.hasAccess(toAlbum: true);
+        bool hasAccess = await Gal.hasAccess();
         if (!hasAccess) {
-          await Gal.requestAccess(toAlbum: true);
+          hasAccess = await Gal.requestAccess();
+        }
+        if (!hasAccess) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('갤러리 접근 권한이 필요합니다.'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+          return;
         }
         final directory = await getTemporaryDirectory();
         final imageFile = File('${directory.path}/lotto_vip_save_${DateTime.now().millisecondsSinceEpoch}.png');
@@ -51,7 +62,7 @@ class _ResultSheetState extends State<ResultSheet> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('이미지가 갤러리에 저장되었습니다.'),
+              content: Text('이미지가 갤러리에 저장되었습니다. 📸'),
               duration: Duration(seconds: 2),
             ),
           );
@@ -271,9 +282,10 @@ class _ResultSheetState extends State<ResultSheet> {
 
                   // 메인 타이틀
                   Text(
-                    '행운의 당첨 번호',
+                    widget.title.isNotEmpty ? widget.title : '행운의 당첨 번호',
+                    textAlign: TextAlign.center,
                     style: GoogleFonts.notoSansKr(
-                      fontSize: 25,
+                      fontSize: 22,
                       fontWeight: FontWeight.w800,
                       color: isLight ? const Color(0xFF191919) : Colors.white,
                       letterSpacing: -0.5,
@@ -370,7 +382,19 @@ class _ResultSheetState extends State<ResultSheet> {
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 8),
+
+              // 카드 저장 안내 힌트
+              Text(
+                '카드를 터치하면 이미지로 갤러리에 저장됩니다 📸',
+                style: GoogleFonts.notoSansKr(
+                  fontSize: 11.5,
+                  color: isLight ? Colors.black45 : Colors.white38,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+
+              const SizedBox(height: 14),
 
               // 하단 버튼 영역 (52px 고정 높이 완벽 대칭 & 반응형 안전 스타일)
               Row(

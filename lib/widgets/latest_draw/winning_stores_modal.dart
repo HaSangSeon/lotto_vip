@@ -6,7 +6,7 @@ import '../../theme/app_theme.dart';
 import '../../services/dhlottery_api.dart';
 import 'winning_store_card.dart';
 
-/// 제 N회 1등 당첨 판매점(명당) 조회 모달
+/// 제 N회 당첨 판매점(명당) 조회 모달 (1등 및 2등 배출점 지원)
 void showWinningStoresModal(BuildContext context, int drwNo) {
   final isLight = AppColors.isLight;
 
@@ -17,11 +17,12 @@ void showWinningStoresModal(BuildContext context, int drwNo) {
     backgroundColor: Colors.transparent,
     builder: (ctx) {
       String filter = '전체';
+      int currentRank = 1; // 1: 1등, 2: 2등
 
       return StatefulBuilder(
         builder: (context, setModalState) {
           return Container(
-            height: MediaQuery.of(context).size.height * 0.85,
+            height: MediaQuery.of(context).size.height * 0.88,
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
@@ -49,7 +50,7 @@ void showWinningStoresModal(BuildContext context, int drwNo) {
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
 
                 // 모달 헤더 (아이콘 + 타이틀 + 닫기 버튼)
                 Padding(
@@ -79,7 +80,7 @@ void showWinningStoresModal(BuildContext context, int drwNo) {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '제 $drwNo회 1등 당첨 판매점',
+                              '제 $drwNo회 당첨 판매점(지역)',
                               style: GoogleFonts.notoSansKr(
                                 fontSize: 17,
                                 fontWeight: FontWeight.bold,
@@ -88,7 +89,7 @@ void showWinningStoresModal(BuildContext context, int drwNo) {
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
-                              '동행복권 공식 1등 배출 명당 목록',
+                              '동행복권 공식 1등·2등 배출 명당 목록',
                               style: GoogleFonts.notoSansKr(
                                 fontSize: 12,
                                 color: AppColors.textHint,
@@ -107,7 +108,55 @@ void showWinningStoresModal(BuildContext context, int drwNo) {
                   ),
                 ),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
+
+                // 1등 배출점 vs 2등 배출점 메인 세그먼트 탭
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Container(
+                    padding: const EdgeInsets.all(3.5),
+                    decoration: BoxDecoration(
+                      color: isLight ? const Color(0xFFF0EAE0) : const Color(0xFF10131C),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isLight ? const Color(0xFFE2D6C3) : Colors.white.withValues(alpha: 0.08),
+                        width: 0.9,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        _buildRankTabButton(
+                          label: '🥇 1등 배출 명당',
+                          isSelected: currentRank == 1,
+                          isLight: isLight,
+                          onTap: () {
+                            if (currentRank != 1) {
+                              setModalState(() {
+                                currentRank = 1;
+                                filter = '전체';
+                              });
+                            }
+                          },
+                        ),
+                        _buildRankTabButton(
+                          label: '🥈 2등 배출 명당',
+                          isSelected: currentRank == 2,
+                          isLight: isLight,
+                          onTap: () {
+                            if (currentRank != 2) {
+                              setModalState(() {
+                                currentRank = 2;
+                                filter = '전체';
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 8),
                 Divider(
                   height: 1,
                   color: isLight ? Colors.black.withValues(alpha: 0.06) : Colors.white.withValues(alpha: 0.08),
@@ -116,7 +165,8 @@ void showWinningStoresModal(BuildContext context, int drwNo) {
                 // 판매점 비동기 데이터 목록
                 Expanded(
                   child: FutureBuilder<List<DHLotteryWinningStore>>(
-                    future: DHLotteryApi.fetchWinningStores(drwNo),
+                    key: ValueKey('store_${drwNo}_$currentRank'),
+                    future: DHLotteryApi.fetchWinningStores(drwNo, rank: currentRank),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return Center(
@@ -126,7 +176,7 @@ void showWinningStoresModal(BuildContext context, int drwNo) {
                               const CircularProgressIndicator(color: AppColors.gold),
                               const SizedBox(height: 16),
                               Text(
-                                '제 $drwNo회 1등 판매점을 불러오는 중...',
+                                '제 $drwNo회 $currentRank등 판매점을 불러오는 중...',
                                 style: GoogleFonts.notoSansKr(
                                   fontSize: 13,
                                   color: AppColors.textSecondary,
@@ -147,7 +197,7 @@ void showWinningStoresModal(BuildContext context, int drwNo) {
                                 Icon(Icons.storefront_outlined, size: 48, color: AppColors.textHint),
                                 const SizedBox(height: 12),
                                 Text(
-                                  '1등 판매점 정보를 불러올 수 없습니다.',
+                                  '$currentRank등 판매점 정보를 불러올 수 없습니다.',
                                   style: GoogleFonts.notoSansKr(
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold,
@@ -207,12 +257,13 @@ void showWinningStoresModal(BuildContext context, int drwNo) {
                       final autoCount = allStores.where((s) => s.winType == '자동').length;
                       final manualCount = allStores.where((s) => s.winType == '수동').length;
                       final semiCount = allStores.where((s) => s.winType == '반자동').length;
+                      final hasTypeInfo = autoCount > 0 || manualCount > 0 || semiCount > 0;
 
                       return Column(
                         children: [
-                          // 1. VIP 명당 요약 배너 (총 배출점 & 자동/수동 한눈에 보기)
+                          // 1. VIP 명당 요약 배너 (오버플로우 방지)
                           Container(
-                            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                            margin: const EdgeInsets.fromLTRB(16, 10, 16, 6),
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
@@ -244,7 +295,7 @@ void showWinningStoresModal(BuildContext context, int drwNo) {
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
-                                    Icons.emoji_events_rounded,
+                                    currentRank == 1 ? Icons.emoji_events_rounded : Icons.military_tech_rounded,
                                     size: 18,
                                     color: isLight ? AppColors.goldDeep : AppColors.gold,
                                   ),
@@ -256,16 +307,17 @@ void showWinningStoresModal(BuildContext context, int drwNo) {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        '1등 배출 명당 총 ${allStores.length}곳',
+                                        '$currentRank등 배출 명당 총 ${allStores.length}곳',
                                         style: GoogleFonts.notoSansKr(
                                           fontSize: 13.5,
                                           fontWeight: FontWeight.w800,
                                           color: isLight ? const Color(0xFF5D4037) : AppColors.goldLight,
                                         ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 1),
                                       Text(
-                                        '전국 행운의 당첨 명당 집계',
+                                        '전국 행운의 당첨 지역 집계',
                                         style: GoogleFonts.notoSansKr(
                                           fontSize: 11,
                                           color: AppColors.textHint,
@@ -276,57 +328,64 @@ void showWinningStoresModal(BuildContext context, int drwNo) {
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                // 우측: 자동/수동 미니 요약 뱃지
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    _buildMiniTypeBadge('자동', autoCount, const Color(0xFF1E88E5)),
-                                    const SizedBox(width: 4),
-                                    _buildMiniTypeBadge('수동', manualCount, const Color(0xFF2E7D32)),
-                                    if (semiCount > 0) ...[
-                                      const SizedBox(width: 4),
-                                      _buildMiniTypeBadge('반자동', semiCount, const Color(0xFF7B1FA2)),
-                                    ],
-                                  ],
-                                ),
+                                if (hasTypeInfo) ...[
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          _buildMiniTypeBadge('자동', autoCount, const Color(0xFF1E88E5)),
+                                          const SizedBox(width: 4),
+                                          _buildMiniTypeBadge('수동', manualCount, const Color(0xFF2E7D32)),
+                                          if (semiCount > 0) ...[
+                                            const SizedBox(width: 4),
+                                            _buildMiniTypeBadge('반자동', semiCount, const Color(0xFF7B1FA2)),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
 
-                          // 2. 상단 필터 탭 바 (전체, 자동, 수동, 반자동)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  _buildFilterChip('전체', allStores.length, filter == '전체', isLight, () {
-                                    setModalState(() => filter = '전체');
-                                  }),
-                                  const SizedBox(width: 6),
-                                  _buildFilterChip('자동', autoCount, filter == '자동', isLight, () {
-                                    setModalState(() => filter = '자동');
-                                  }, activeColor: const Color(0xFF1E88E5)),
-                                  const SizedBox(width: 6),
-                                  _buildFilterChip('수동', manualCount, filter == '수동', isLight, () {
-                                    setModalState(() => filter = '수동');
-                                  }, activeColor: const Color(0xFF2E7D32)),
-                                  if (semiCount > 0) ...[
+                          // 2. 상단 필터 탭 바 (자동/수동 정보가 있는 경우만 노출)
+                          if (hasTypeInfo)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    _buildFilterChip('전체', allStores.length, filter == '전체', isLight, () {
+                                      setModalState(() => filter = '전체');
+                                    }),
                                     const SizedBox(width: 6),
-                                    _buildFilterChip('반자동', semiCount, filter == '반자동', isLight, () {
-                                      setModalState(() => filter = '반자동');
-                                    }, activeColor: const Color(0xFF7B1FA2)),
+                                    _buildFilterChip('자동', autoCount, filter == '자동', isLight, () {
+                                      setModalState(() => filter = '자동');
+                                    }, activeColor: const Color(0xFF1E88E5)),
+                                    const SizedBox(width: 6),
+                                    _buildFilterChip('수동', manualCount, filter == '수동', isLight, () {
+                                      setModalState(() => filter = '수동');
+                                    }, activeColor: const Color(0xFF2E7D32)),
+                                    if (semiCount > 0) ...[
+                                      const SizedBox(width: 6),
+                                      _buildFilterChip('반자동', semiCount, filter == '반자동', isLight, () {
+                                        setModalState(() => filter = '반자동');
+                                      }, activeColor: const Color(0xFF7B1FA2)),
+                                    ],
                                   ],
-                                ],
+                                ),
                               ),
                             ),
-                          ),
 
                           // 3. 판매점 리스트
                           Expanded(
                             child: ListView.separated(
-                              padding: EdgeInsets.fromLTRB(16, 0, 16, 24 + MediaQuery.of(context).padding.bottom),
+                              padding: EdgeInsets.fromLTRB(16, 4, 16, 24 + MediaQuery.of(context).padding.bottom),
                               itemCount: filteredStores.length,
                               separatorBuilder: (_, _) => const SizedBox(height: 12),
                               itemBuilder: (context, idx) {
@@ -349,6 +408,59 @@ void showWinningStoresModal(BuildContext context, int drwNo) {
         },
       );
     },
+  );
+}
+
+Widget _buildRankTabButton({
+  required String label,
+  required bool isSelected,
+  required bool isLight,
+  required VoidCallback onTap,
+}) {
+  return Expanded(
+    child: InkWell(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isLight ? Colors.white : AppColors.gold.withValues(alpha: 0.2))
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected
+                ? (isLight ? const Color(0xFFD4AF37) : AppColors.gold)
+                : Colors.transparent,
+            width: 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.notoSansKr(
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            color: isSelected
+                ? (isLight ? AppColors.goldDeep : Colors.white)
+                : AppColors.textSecondary,
+          ),
+        ),
+      ),
+    ),
   );
 }
 

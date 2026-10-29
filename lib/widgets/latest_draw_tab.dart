@@ -11,7 +11,12 @@ import 'latest_draw/winning_numbers_showcase.dart';
 import 'latest_draw/draw_nav_header.dart';
 
 class LatestDrawTab extends StatefulWidget {
-  const LatestDrawTab({super.key});
+  final bool? isLight;
+
+  const LatestDrawTab({
+    super.key,
+    this.isLight,
+  });
 
   @override
   State<LatestDrawTab> createState() => _LatestDrawTabState();
@@ -25,7 +30,14 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
   @override
   void initState() {
     super.initState();
-    _fetchData();
+    final cached = DHLotteryApi.cachedResult;
+    if (cached != null) {
+      _result = cached;
+      _latestDrwNo = cached.drwNo;
+      _isLoading = false;
+    } else {
+      _fetchData();
+    }
   }
 
   Future<void> _fetchData([int? targetDrwNo]) async {
@@ -112,8 +124,8 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
                 style: GoogleFonts.notoSansKr(fontWeight: FontWeight.w600),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.isLight ? AppColors.goldDark : AppColors.gold,
-                foregroundColor: AppColors.isLight ? Colors.white : Colors.black,
+                backgroundColor: (widget.isLight ?? AppColors.isLight) ? AppColors.goldDark : AppColors.gold,
+                foregroundColor: (widget.isLight ?? AppColors.isLight) ? Colors.white : Colors.black,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               ),
@@ -126,7 +138,7 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
     final formatCurrency = NumberFormat.currency(locale: 'ko_KR', symbol: '₩ ', decimalDigits: 0);
     final result = _result!;
     final isRollover = result.isRollover;
-    final isLight = AppColors.isLight;
+    final effectiveIsLight = widget.isLight ?? (Theme.of(context).brightness == Brightness.light);
 
     return SizedBox.expand(
       child: Stack(
@@ -143,7 +155,7 @@ class _LatestDrawTabState extends State<LatestDrawTab> {
                   gradient: RadialGradient(
                     center: Alignment.topCenter,
                     radius: 1.15,
-                    colors: isLight
+                    colors: effectiveIsLight
                         ? [
                             AppColors.gold.withValues(alpha: 0.22),
                             AppColors.gold.withValues(alpha: 0.06),

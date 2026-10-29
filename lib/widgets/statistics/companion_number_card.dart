@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../services/statistics_service.dart';
 import '../../theme/app_theme.dart';
 import '../common_widgets.dart';
 import '../lotto_ball.dart';
 
 /// 내 번호 짝꿍 찾기 (궁합 번호) 섹션 위젯
 class CompanionNumberCard extends StatefulWidget {
+  final bool? isLight;
   final int initialNumber;
   final ValueChanged<int>? onNumberChanged;
 
   const CompanionNumberCard({
     super.key,
+    this.isLight,
     this.initialNumber = 7,
     this.onNumberChanged,
   });
@@ -31,15 +34,15 @@ class _CompanionNumberCardState extends State<CompanionNumberCard> {
 
   @override
   Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> companionData = [
-      {'number': (_selectedCompanionNumber + 5) % 45 == 0 ? 45 : (_selectedCompanionNumber + 5) % 45, 'count': 42},
-      {'number': (_selectedCompanionNumber + 11) % 45 == 0 ? 45 : (_selectedCompanionNumber + 11) % 45, 'count': 38},
-      {'number': (_selectedCompanionNumber + 23) % 45 == 0 ? 45 : (_selectedCompanionNumber + 23) % 45, 'count': 35},
-      {'number': (_selectedCompanionNumber + 31) % 45 == 0 ? 45 : (_selectedCompanionNumber + 31) % 45, 'count': 33},
-      {'number': (_selectedCompanionNumber + 40) % 45 == 0 ? 45 : (_selectedCompanionNumber + 40) % 45, 'count': 31},
-    ];
+    final effectiveIsLight = widget.isLight ?? AppColors.isLight;
+    final List<Map<String, dynamic>> companionData =
+        StatisticsService.getCompanionNumbers(_selectedCompanionNumber);
 
     return GlassCard(
+      gradientColors: effectiveIsLight
+          ? const [Color(0xFFFFFEFA), Color(0xFFFFF8E0)]
+          : const [Color(0xFF181B28), Color(0xFF141722)],
+      borderColor: effectiveIsLight ? AppColors.lightGoldBorder.withValues(alpha: 0.35) : AppColors.borderGold,
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

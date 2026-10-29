@@ -5,7 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../theme/app_theme.dart';
 import '../../services/dhlottery_api.dart';
 
-/// 주소 또는 상호명에서 직관적인 지역 태그 추출 (예: '서울 성북', '경기 성남', '온라인')
+/// 주소 또는 상호명에서 직관적인 지역 태그 추출 (예: '서울 성북', '경기 성남', '세종', '온라인')
 String extractWinningStoreRegion(DHLotteryWinningStore store) {
   if (store.address.contains('dhlottery') || store.name.contains('인터넷')) {
     return '온라인';
@@ -13,23 +13,45 @@ String extractWinningStoreRegion(DHLotteryWinningStore store) {
   final cleanAddr = store.address.trim();
   final tokens = cleanAddr.split(RegExp(r'\s+'));
   if (tokens.isNotEmpty && tokens[0].isNotEmpty) {
-    if (tokens.length >= 2) {
-      String s0 = tokens[0];
-      if (s0.startsWith('전남광주') || s0 == '광주광역시') {
-        s0 = '광주';
-      } else if (s0.endsWith('특별시') || s0.endsWith('광역시')) {
-        s0 = s0.substring(0, s0.length - 3);
-      } else if (s0.endsWith('특별자치시') || s0.endsWith('특별자치도')) {
-        s0 = s0.substring(0, 2);
+    String s0 = tokens[0];
+    if (s0.startsWith('전남광주') || s0 == '광주광역시') {
+      s0 = '광주';
+    } else if (s0 == '세종특별자치시' || s0.startsWith('세종')) {
+      // 세종은 시/군/구가 없으므로 바로 '세종' 또는 읍/면 반환
+      if (tokens.length >= 2 && (tokens[1].endsWith('읍') || tokens[1].endsWith('면'))) {
+        return '세종 ${tokens[1]}';
       }
+      return '세종';
+    } else if (s0.endsWith('특별시') || s0.endsWith('광역시')) {
+      s0 = s0.substring(0, s0.length - 3);
+    } else if (s0 == '충청북도') {
+      s0 = '충북';
+    } else if (s0 == '충청남도') {
+      s0 = '충남';
+    } else if (s0 == '전라북도' || s0 == '전북특별자치도') {
+      s0 = '전북';
+    } else if (s0 == '전라남도') {
+      s0 = '전남';
+    } else if (s0 == '경상북도') {
+      s0 = '경북';
+    } else if (s0 == '경상남도') {
+      s0 = '경남';
+    } else if (s0 == '강원특별자치도' || s0 == '강원도') {
+      s0 = '강원';
+    } else if (s0 == '제주특별자치도' || s0 == '제주도') {
+      s0 = '제주';
+    } else if (s0.endsWith('특별자치도')) {
+      s0 = s0.substring(0, 2);
+    }
 
+    if (tokens.length >= 2) {
       String s1 = tokens[1];
       if (s1.length > 2 && (s1.endsWith('구') || s1.endsWith('군') || s1.endsWith('시'))) {
         s1 = s1.substring(0, s1.length - 1);
       }
       return '$s0 $s1';
     }
-    return tokens[0];
+    return s0;
   }
   if (store.region.isNotEmpty && store.region != 'null') {
     return store.region;
@@ -55,15 +77,26 @@ class WinningStoreCard extends StatelessWidget {
     final isOnline = store.address.contains('dhlottery') || store.name.contains('인터넷');
     final regionLabel = extractWinningStoreRegion(store);
 
-    final Color typeColor = store.winType == '수동'
-        ? const Color(0xFF2E7D32)
-        : (store.winType == '반자동'
-            ? const Color(0xFF7B1FA2)
-            : const Color(0xFF1E88E5));
+    final isRank2 = store.rank == 2;
+    final hasSpecificType = store.winType == '수동' || store.winType == '반자동' || store.winType == '자동';
 
-    final typeIcon = store.winType == '수동'
-        ? Icons.edit_note_rounded
-        : (store.winType == '반자동' ? Icons.auto_awesome_rounded : Icons.bolt_rounded);
+    final Color typeColor = isRank2
+        ? const Color(0xFF1565C0)
+        : (store.winType == '수동'
+            ? const Color(0xFF2E7D32)
+            : (store.winType == '반자동'
+                ? const Color(0xFF7B1FA2)
+                : (store.winType == '자동' ? const Color(0xFF1E88E5) : AppColors.textSecondary)));
+
+    final typeIcon = isRank2
+        ? Icons.military_tech_rounded
+        : (store.winType == '수동'
+            ? Icons.edit_note_rounded
+            : (store.winType == '반자동' ? Icons.auto_awesome_rounded : Icons.bolt_rounded));
+
+    final badgeLabel = isRank2
+        ? '2등 배출점'
+        : (hasSpecificType ? '${store.winType} 1등' : '1등 배출점');
 
     return Container(
       padding: const EdgeInsets.all(15),
@@ -168,7 +201,7 @@ class WinningStoreCard extends StatelessWidget {
                     Icon(typeIcon, size: 11.5, color: typeColor),
                     const SizedBox(width: 3),
                     Text(
-                      '${store.winType} 1등',
+                      badgeLabel,
                       style: GoogleFonts.notoSansKr(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,

@@ -13,6 +13,7 @@ class TicketHistoryCard extends StatefulWidget {
   final LottoHistoryEntry entry;
   final DHLotteryResult? targetResult;
   final bool isInitiallyCollapsed;
+  final VoidCallback? onToggleCollapse;
   final VoidCallback onToggleFavorite;
   final VoidCallback onDelete;
 
@@ -21,6 +22,7 @@ class TicketHistoryCard extends StatefulWidget {
     required this.entry,
     this.targetResult,
     this.isInitiallyCollapsed = false,
+    this.onToggleCollapse,
     required this.onToggleFavorite,
     required this.onDelete,
   });
@@ -36,6 +38,14 @@ class _TicketHistoryCardState extends State<TicketHistoryCard> {
   void initState() {
     super.initState();
     _isCollapsed = widget.isInitiallyCollapsed;
+  }
+
+  @override
+  void didUpdateWidget(covariant TicketHistoryCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isInitiallyCollapsed != oldWidget.isInitiallyCollapsed) {
+      _isCollapsed = widget.isInitiallyCollapsed;
+    }
   }
 
   @override
@@ -82,54 +92,67 @@ class _TicketHistoryCardState extends State<TicketHistoryCard> {
           // 🌟 1. 헤더 행: [🎫 실물 복권] [제1158회 • 5게임] ──── [당첨 요약 뱃지] [❤️] [🗑️]
           Row(
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const LottoTypeBadge(type: LottoEntryType.qrScan),
-                  const SizedBox(width: 6),
-                  LottoDrawBadge(drawNo: entry.drawNo, gameCount: entry.gameCount),
-                ],
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const LottoTypeBadge(type: LottoEntryType.qrScan),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: LottoDrawBadge(drawNo: entry.drawNo, gameCount: entry.gameCount),
+                    ),
+                  ],
+                ),
               ),
-              const Spacer(),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  LottoTicketSummaryBadge(
-                    bestRank: summary.bestRank,
-                    summaryLabel: summary.summaryLabel,
-                    badgeColor: summary.badgeColor,
-                  ),
-                  const SizedBox(width: 8),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: LottoTicketSummaryBadge(
+                          bestRank: summary.bestRank,
+                          summaryLabel: summary.summaryLabel,
+                          badgeColor: summary.badgeColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
 
-                  // 즐겨찾기 버튼
-                  HistoryActionButton(
-                    icon: entry.isFavorite
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    iconColor: entry.isFavorite
-                        ? (isLight ? const Color(0xFFE53935) : const Color(0xFFFF5252))
-                        : AppColors.textHint,
-                    bgColor: entry.isFavorite
-                        ? (isLight
-                            ? const Color(0xFFFFECEB)
-                            : const Color(0xFFE53935).withValues(alpha: 0.18))
-                        : null,
-                    borderColor: entry.isFavorite
-                        ? (isLight
-                            ? const Color(0xFFFF8A80).withValues(alpha: 0.6)
-                            : const Color(0xFFFF5252).withValues(alpha: 0.4))
-                        : null,
-                    onTap: widget.onToggleFavorite,
-                  ),
-                  const SizedBox(width: 6),
+                    // 즐겨찾기 버튼
+                    HistoryActionButton(
+                      icon: entry.isFavorite
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      iconColor: entry.isFavorite
+                          ? (isLight ? const Color(0xFFE53935) : const Color(0xFFFF5252))
+                          : AppColors.textHint,
+                      bgColor: entry.isFavorite
+                          ? (isLight
+                              ? const Color(0xFFFFECEB)
+                              : const Color(0xFFE53935).withValues(alpha: 0.18))
+                          : null,
+                      borderColor: entry.isFavorite
+                          ? (isLight
+                              ? const Color(0xFFFF8A80).withValues(alpha: 0.6)
+                              : const Color(0xFFFF5252).withValues(alpha: 0.4))
+                          : null,
+                      onTap: widget.onToggleFavorite,
+                    ),
+                    const SizedBox(width: 6),
 
-                  // 개별 삭제 버튼
-                  HistoryActionButton(
-                    icon: Icons.delete_outline_rounded,
-                    iconColor: AppColors.textHint,
-                    onTap: widget.onDelete,
-                  ),
-                ],
+                    // 개별 삭제 버튼
+                    HistoryActionButton(
+                      icon: Icons.delete_outline_rounded,
+                      iconColor: AppColors.textHint,
+                      onTap: widget.onDelete,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -163,48 +186,137 @@ class _TicketHistoryCardState extends State<TicketHistoryCard> {
             ),
             child: Column(
               children: [
-                if (_isCollapsed) ...[
-                  // 접힌 상태: 첫 번째 게임 한 줄
-                  InkWell(
-                    onTap: () => setState(() => _isCollapsed = false),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 22,
-                            height: 22,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isLight ? Colors.grey.shade300 : Colors.white12,
-                            ),
-                            child: Text(
-                              games.isNotEmpty ? games.first.label : 'A',
-                              style: GoogleFonts.rajdhani(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: AppColors.textPrimary,
+                if (_isCollapsed && games.length > 1) ...[
+                  // 접힌 상태: 가장 좋은 등수 게임(없으면 A게임) 1줄 + 미니 등수 배지
+                  Builder(
+                    builder: (context) {
+                      SavedLotteryGame displayGame = games.first;
+                      int bestRank = 999;
+                      Color bestBadgeColor = Colors.white24;
+
+                      for (final g in games) {
+                        final matched = targetResult != null
+                            ? g.numbers.where((n) => targetResult.numbers.contains(n)).toSet()
+                            : <int>{};
+                        final isBonus = targetResult != null && g.numbers.contains(targetResult.bonusNo);
+                        final matchCount = matched.length;
+
+                        int r = 0;
+                        if (targetResult != null) {
+                          if (matchCount == 6) {
+                            r = 1;
+                          } else if (matchCount == 5 && isBonus) {
+                            r = 2;
+                          } else if (matchCount == 5) {
+                            r = 3;
+                          } else if (matchCount == 4) {
+                            r = 4;
+                          } else if (matchCount == 3) {
+                            r = 5;
+                          }
+                        }
+
+                        if (r >= 1 && r <= 5 && r < bestRank) {
+                          bestRank = r;
+                          displayGame = g;
+                        }
+                      }
+
+                      final matched = targetResult != null
+                          ? displayGame.numbers.where((n) => targetResult.numbers.contains(n)).toSet()
+                          : <int>{};
+                      final isBonus = targetResult != null && displayGame.numbers.contains(targetResult.bonusNo);
+                      final matchCount = matched.length;
+
+                      int rank = 0;
+                      if (targetResult != null) {
+                        if (matchCount == 6) {
+                          rank = 1;
+                        } else if (matchCount == 5 && isBonus) {
+                          rank = 2;
+                        } else if (matchCount == 5) {
+                          rank = 3;
+                        } else if (matchCount == 4) {
+                          rank = 4;
+                        } else if (matchCount == 3) {
+                          rank = 5;
+                        }
+                      }
+
+                      switch (rank) {
+                        case 1:
+                          bestBadgeColor = const Color(0xFFFFD700);
+                          break;
+                        case 2:
+                          bestBadgeColor = const Color(0xFF5DADE2);
+                          break;
+                        case 3:
+                          bestBadgeColor = const Color(0xFFE59866);
+                          break;
+                        case 4:
+                          bestBadgeColor = const Color(0xFF2ECC71);
+                          break;
+                        case 5:
+                          bestBadgeColor = const Color(0xFFF39C12);
+                          break;
+                        default:
+                          bestBadgeColor = Colors.white24;
+                      }
+
+                      return InkWell(
+                        onTap: () {
+                          setState(() => _isCollapsed = false);
+                          widget.onToggleCollapse?.call();
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 22,
+                                height: 22,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isLight ? const Color(0xFFFFF0C2) : AppColors.gold.withValues(alpha: 0.18),
+                                  border: Border.all(
+                                    color: isLight ? const Color(0xFFD4AF37) : AppColors.gold.withValues(alpha: 0.4),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: Text(
+                                  displayGame.label,
+                                  style: GoogleFonts.rajdhani(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    color: AppColors.goldText,
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: LottoBallRow(
+                                  numbers: displayGame.numbers,
+                                  ballSize: 30,
+                                  matchedNumbers: targetResult != null ? matched : null,
+                                  bonusNumber: (rank == 2) ? targetResult?.bonusNo : null,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              if (targetResult != null)
+                                LottoMiniRankBadge(
+                                  rank: rank,
+                                  matchedCount: matchCount,
+                                  badgeColor: bestBadgeColor,
+                                ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: LottoBallRow(
-                              numbers: games.isNotEmpty ? games.first.numbers : entry.numbers,
-                              ballSize: 30,
-                              matchedNumbers: targetResult != null
-                                  ? games.first.numbers.where((n) => targetResult.numbers.contains(n)).toSet()
-                                  : null,
-                              bonusNumber: targetResult?.bonusNo,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      );
+                    },
                   ),
                 ] else ...[
-                  // 펼쳐진 상태: 전체 게임 출력
+                  // 펼쳐진 상태 또는 1게임인 경우 전체 게임 출력
                   ...games.map((game) {
                     final matched = targetResult != null
                         ? game.numbers.where((n) => targetResult.numbers.contains(n)).toSet()
@@ -279,7 +391,7 @@ class _TicketHistoryCardState extends State<TicketHistoryCard> {
                               numbers: game.numbers,
                               ballSize: 30,
                               matchedNumbers: targetResult != null ? matched : null,
-                              bonusNumber: targetResult?.bonusNo,
+                              bonusNumber: (rank == 2) ? targetResult?.bonusNo : null,
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -300,45 +412,51 @@ class _TicketHistoryCardState extends State<TicketHistoryCard> {
 
           const SizedBox(height: 10),
 
-          // 🌟 3. 하단 접기/펼치기 토글 & 등록 일시
+          // 🌟 3. 하단 접기/펼치기 토글 & 등록 일시 (2게임 이상일 때만 토글 제공)
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: entry.gameCount > 1
+                ? MainAxisAlignment.spaceBetween
+                : MainAxisAlignment.end,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              InkWell(
-                onTap: () => setState(() => _isCollapsed = !_isCollapsed),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                  decoration: BoxDecoration(
-                    color: isLight
-                        ? Colors.black.withValues(alpha: 0.04)
-                        : Colors.white.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _isCollapsed
-                            ? '전체 ${entry.gameCount}게임 보기'
-                            : '영수증 접기',
-                        style: GoogleFonts.notoSansKr(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+              if (entry.gameCount > 1)
+                InkWell(
+                  onTap: () {
+                    setState(() => _isCollapsed = !_isCollapsed);
+                    widget.onToggleCollapse?.call();
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: isLight
+                          ? Colors.black.withValues(alpha: 0.04)
+                          : Colors.white.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _isCollapsed
+                              ? '전체 ${entry.gameCount}게임 보기'
+                              : '영수증 접기',
+                          style: GoogleFonts.notoSansKr(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.goldText,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Icon(
+                          _isCollapsed ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded,
+                          size: 15,
                           color: AppColors.goldText,
                         ),
-                      ),
-                      const SizedBox(width: 2),
-                      Icon(
-                        _isCollapsed ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded,
-                        size: 15,
-                        color: AppColors.goldText,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

@@ -8,6 +8,7 @@ import 'common_widgets.dart';
 import 'lotto_ball.dart';
 
 class CustomTab extends StatelessWidget {
+  final bool? isLight;
   final List<int> customNumbers;
   final List<int> includeNumbers;
   final List<int> excludeNumbers;
@@ -16,6 +17,7 @@ class CustomTab extends StatelessWidget {
 
   const CustomTab({
     super.key,
+    this.isLight,
     required this.customNumbers,
     required this.includeNumbers,
     required this.excludeNumbers,
@@ -25,11 +27,11 @@ class CustomTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLight = AppColors.isLight;
+    final isLight = this.isLight ?? (Theme.of(context).brightness == Brightness.light);
     final bool hasFilter = includeNumbers.isNotEmpty || excludeNumbers.isNotEmpty;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: const EdgeInsets.only(bottom: 20),
       child: Column(
         children: [
           // 메인 설정 및 생성 카드
@@ -129,12 +131,16 @@ class CustomTab extends StatelessWidget {
                                 color: isLight ? AppColors.goldDeep : AppColors.gold,
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                hasFilter ? '고정수 / 제외수 변경하기' : '고정수 / 제외수 상세 필터 설정',
-                                style: GoogleFonts.notoSansKr(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13.5,
-                                  color: isLight ? AppColors.goldDeep : AppColors.textPrimary,
+                              Flexible(
+                                child: Text(
+                                  hasFilter ? '고정수 / 제외수 변경하기' : '고정수 / 제외수 상세 필터 설정',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.notoSansKr(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13.5,
+                                    color: isLight ? AppColors.goldDeep : AppColors.textPrimary,
+                                  ),
                                 ),
                               ),
                             ],
@@ -182,16 +188,39 @@ class CustomTab extends StatelessWidget {
                           ),
                           child: ElevatedButton.icon(
                             onPressed: () {
+                              if (includeNumbers.isEmpty && excludeNumbers.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '고정수나 제외수를 최소 1개 이상 선택해 주세요!',
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.notoSansKr(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    backgroundColor: const Color(0xFFD32F2F),
+                                    behavior: SnackBarBehavior.floating,
+                                    margin: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                );
+                                return;
+                              }
                               HapticFeedback.mediumImpact();
                               onGenerate();
                             },
                             icon: const Icon(Icons.bolt_rounded, color: Colors.white, size: 22),
-                            label: Text(
-                              '맞춤 번호 조합 추출하기',
-                              style: GoogleFonts.notoSansKr(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
-                                color: Colors.white,
+                            label: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '맞춤 번호 조합 추출하기',
+                                maxLines: 1,
+                                style: GoogleFonts.notoSansKr(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                             style: ElevatedButton.styleFrom(
@@ -229,9 +258,13 @@ class CustomTab extends StatelessWidget {
                             onGenerate();
                           },
                           icon: const Icon(Icons.bolt_rounded, color: Colors.black, size: 22),
-                          label: Text(
-                            '맞춤 번호 조합 추출하기',
-                            style: GoogleFonts.notoSansKr(fontWeight: FontWeight.w800, fontSize: 15),
+                          label: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '맞춤 번호 조합 추출하기',
+                              maxLines: 1,
+                              style: GoogleFonts.notoSansKr(fontWeight: FontWeight.w800, fontSize: 15),
+                            ),
                           ),
                           style: ElevatedButton.styleFrom(
                             minimumSize: const Size(double.infinity, 52),
